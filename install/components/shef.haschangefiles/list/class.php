@@ -14,6 +14,7 @@ use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\Type\DateTime;
 use Shef\Options\Components;
 use Shef\Haschangefiles\Main\Constants;
+use Shef\Haschangefiles\Main\Utils;
 
 Loc::loadMessages(__FILE__);
 
@@ -22,12 +23,12 @@ if(!Loader::includeModule('shef.options'))
 	die('Can\'t include module shef.options');
 }
 
-enum PrefixContent: string
+// Компонент использует классы своего модуля (Shef\Haschangefiles\Main\Utils —
+// логика детекта дрейфа правок). Подключаем модуль явно, иначе его namespace
+// не автозагружается и класс не находится.
+if(!Loader::includeModule('shef.haschangefiles'))
 {
-	case TP_1 = '// change';
-	case TP_2 = '//change';
-	case TP_3 = '//cahnge';
-	case TP_4 = '// cahnge';
+	die('Can\'t include module shef.haschangefiles');
 }
 
 class ListComponentRow
@@ -66,28 +67,15 @@ class ListComponentRow
 	 */
 	public function isNeedFix(): bool
 	{
-		if(!$this->getOri()->isExists())
-		{
-			return true;
-		}
-		elseif(!$this->getChg()->isExists())
-		{
-			return true;
-		}
-		elseif($this->getChg()->getSize() !== $this->getOri()->getSize())
-		{
-			return true;
-		}
-		
-		if(
-			$this->getOri()->getContentComments() > 0
-			&& $this->getChg()->getSize() === $this->getOri()->getSize()
-		)
-		{
-			return false;
-		}
-		
-		return true;
+		// Единый источник эвристики — Shef\Haschangefiles\Main\Utils::needFix()
+		// (переиспользуется CLI-раннером cli/check-core-changes.php).
+		return Utils::needFix(
+			$this->getOri()->isExists(),
+			$this->getChg()->isExists(),
+			(int)$this->getOri()->getSize(),
+			(int)$this->getChg()->getSize(),
+			$this->getOri()->getContentComments()
+		);
 	}
 }
 
@@ -167,17 +155,8 @@ class ListComponentFile
 		}
 		
 		$content = $this->getFile()->getContents();
-		
-		return array_sum(
-			array_map(
-				function(PrefixContent $enum)
-				use (&$content)
-				{
-					return substr_count($content, $enum->value);
-				},
-				PrefixContent::cases()
-			)
-		);
+
+		return Utils::countChangeMarkers((string)$content);
 	}
 }
 
@@ -185,7 +164,7 @@ class ListComponent
 	extends Components\AComponent
 {
 	private const GridId = 'SHEF_HAS_CHANGE_FILE_GRID';
-	public const FindPrefixFile = 'has-change_';
+	public const FindPrefixFile = Utils::FIND_PREFIX_FILE;
 	
 	// region Modules ////
 	protected static function getModulesList(): array
