@@ -1,23 +1,38 @@
 {
-	"name": "shef/haschangefiles",
-	"description": "Учёт исправленных файлов ядра",
+	"name": "bxshef/haschangefiles",
+	"description": "Битрикс24 (коробка): учёт исправленных файлов ядра — какие правки перезаписало обновление и что вернуть",
+	"type": "bitrix-module",
+	"license": "MIT",
 	"keywords": [
+		"bitrix",
 		"Bitrix24",
-		"PHP"
+		"local-module",
+		"core-patches",
+		"update"
 	],
-	"minimum-stability": "stable",
-	"license": "proprietary",
-	"type": "bitrix-d7-module",
+	"homepage": "https://github.com/bx-shef/haschangefiles",
 	"authors": [
 		{
 			"name": "Igor Shevchik",
-			"email": "shevchik.mail@gmail.com"
+			"email": "offer@bx-shef.by",
+			"homepage": "https://bx-shef.by/"
 		}
 	],
+	"support": {
+		"issues": "https://github.com/bx-shef/haschangefiles/issues",
+		"source": "https://github.com/bx-shef/haschangefiles"
+	},
+	"minimum-stability": "stable",
 	"require": {
-		"php": ">=8.1.0",
+		"php": ">=8.2.0",
 		"ext-mbstring": "*",
-		"shef/options": "^2.2",
-		"shef/uiclear": "^1.1"
+		"composer/installers": "^1.0 || ^2.0",
+		"bxshef/options": "^3.0"
+	},
+	"extra": {
+		"installer-name": "shef.haschangefiles",
+		"branch-alias": {
+			"dev-main": "2.x-dev"
+		}
 	}
 }

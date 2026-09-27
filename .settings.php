@@ -3,7 +3,7 @@
 /**
  * Настраиваемые параметры модуля
  *
- * * requireModules -> обязательные модулей
+ * * requireModules -> обязательные модули
  * * requirePhpExt -> обязательные расширения PHP
  * * registerAutoLoadClasses -> авто подгрузка классов
  * * registerNamespace -> авто подгрузка Namespace
@@ -11,21 +11,20 @@
  * * installEvents -> события для установки
  * * installDir -> пути установки файлов
  * * controllers -> контроллеры для ajax
- * * ui.entity-selector -> провайдер для диалога выбора сущностей
- * * intranet.customSection -> указывает провайдер страниц левого меню Если нужно использовать из другого модуля - то в installLeftMenu[] указываем moduleId
- * * installLeftMenu -> разделы и страницы в левом меню
  *
- * @memo installLeftMenu[].pages[].settingsRow не серилизовать.
- * @memo installLeftMenu[].code и installLeftMenu[].pages[].code писать без разделителей
- * @memo installLeftMenu[].pages[].settingsRow первый параметр компонет. Остальное смотреть в контроллере intranet.customSection
+ * Классы самого модуля (Shef\Haschangefiles\...) в registerNamespace не
+ * нужны: ядро отображает их в lib/ по соглашению. Чужих библиотек у модуля
+ * нет.
  *
+ * installDir пуст сознательно: страница отчёта в /bitrix/admin не
+ * копируется, а пишется (Main\AdminPage) — путь в ней зависит от того, где
+ * стоит модуль. Компонентов, скриптов и стилей модуль не раскладывает.
  */
 
 return [
 	'requireModules' => [
 		'value' => [
 			'shef.options',
-			'shef.uiclear',
 		],
 		'readonly' => true,
 	],
@@ -48,18 +47,6 @@ return [
 	'installEvents' => [
 		'value' => [
 			[
-				'isCompatible' => false,
-				'from' => [
-					'module' => 'shef.uiclear',
-					'event' => 'onBitrixMenuExtInitTopPanelUserMenu'
-				],
-				'to' => [
-					'module' => 'shef.haschangefiles',
-					'class' => '\Shef\Haschangefiles\Integration\Shef\UiClear\Events',
-					'function' => 'onBitrixMenuExtInitTopPanelUserMenu'
-				]
-			],
-			[
 				'isCompatible' => true,
 				'from' => [
 					'module' => 'main',
@@ -67,48 +54,21 @@ return [
 				],
 				'to' => [
 					'module' => 'shef.haschangefiles',
-					'class' => '\Shef\Haschangefiles\Integration\Shef\UiClear\Events',
+					'class' => '\Shef\Haschangefiles\Integration\Main\Events',
 					'function' => 'onAdminContextMenuShow'
 				]
-			]
+			],
 		],
 		'readonly' => true,
 	],
 	'installDir' => [
-		'value' => [
-			[
-				'type' => 'components',
-				'from' => '/install/components',
-				'to' => '/local/components',
-				'customPathUnInstall' => [],
-				'isNeedUnInstall' => true,
-			],
-			[
-				'type' => 'localAdmin',
-				'from' => '/install/local/admin',
-				'to' => '/local/admin',
-				'customPathUnInstall' => [],
-				'isNeedUnInstall' => true,
-			],
-			[
-				'type' => 'components',
-				'from' => '/install/components',
-				'to' => '/local/components',
-				'customPathUnInstall' => [],
-				'isNeedUnInstall' => true,
-			],
-			[
-				'type' => 'images',
-				'from' => '/install/images',
-				'to' => '/bitrix/images',
-				'customPathUnInstall' => [],
-				'isNeedUnInstall' => true,
-			],
-		],
+		'value' => [],
 		'readonly' => true,
 	],
 	'controllers' => [
-		'value' => [],
+		'value' => [
+			'namespaces' => [],
+		],
 		'readonly' => true,
 	]
 ];

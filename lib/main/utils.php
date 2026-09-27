@@ -3,87 +3,115 @@
 namespace Shef\Haschangefiles\Main;
 
 /**
- * Единый источник логики учёта правок ядра (`has-change_*`).
+ * Правила учёта правок ядра — одни на страницу модуля и на проверку из
+ * консоли (cli/check-core-changes.php).
  *
- * Раньше эта логика жила только внутри компонента `shef.haschangefiles:list`
- * (админ-страница). Вынесена сюда, чтобы её могли переиспользовать и компонент,
- * и CLI-раннер (`cli/check-core-changes.php`) — один источник истины для
- * детекта дрейфа правок после обновления Битрикса.
+ * Правка ядра помечается блоком `// change ////` … `// change stop ////`, а
+ * рядом с файлом кладётся его копия с правкой — зеркало `has-change_<имя>`.
+ * Обновление Битрикса перезаписывает файл, зеркало остаётся: по их
+ * расхождению и видно, какую правку надо вернуть.
+ *
+ * Класс самодостаточен — ни ядра, ни модуля: консольная проверка подключает
+ * его явным require_once и работает без поднятого портала.
  */
 class Utils
 {
-    /** Префикс файла-зеркала правки: `has-change_<оригинал>`. */
-    public const FIND_PREFIX_FILE = 'has-change_';
+	/** Префикс зеркала правки: `has-change_<оригинал>`. */
+	public const FIND_PREFIX_FILE = 'has-change_';
 
-    /**
-     * Варианты маркера правки в теле файла (в т.ч. исторические опечатки).
-     * Блок правки: `// change ////` … `// change stop ////`.
-     *
-     * @return string[]
-     */
-    public static function changeMarkers(): array
-    {
-        return ['// change', '//change', '//cahnge', '// cahnge'];
-    }
+	/**
+	 * Варианты маркера правки в теле файла, включая опечатки, которые уже
+	 * разошлись по порталам: исправить их там некому, а не считать — значит
+	 * показать правку как пропавшую.
+	 *
+	 * @return string[]
+	 */
+	public static function changeMarkers(): array
+	{
+		return ['// change', '//change', '//cahnge', '// cahnge'];
+	}
 
-    /** Является ли имя файла зеркалом правки (`has-change_*`). */
-    public static function isMirrorName(string $fileName): bool
-    {
-        return str_starts_with($fileName, self::FIND_PREFIX_FILE);
-    }
+	/** Имя файла — зеркало правки? */
+	public static function isMirrorName(string $fileName): bool
+	{
+		return str_starts_with($fileName, static::FIND_PREFIX_FILE)
+			&& strlen($fileName) > strlen(static::FIND_PREFIX_FILE);
+	}
 
-    /** Путь оригинала по пути зеркала (убираем префикс из имени файла). */
-    public static function originalPath(string $mirrorPath): string
-    {
-        $dir = dirname($mirrorPath);
-        $name = basename($mirrorPath);
-        if (str_starts_with($name, self::FIND_PREFIX_FILE)) {
-            $name = substr($name, strlen(self::FIND_PREFIX_FILE));
-        }
+	/**
+	 * Путь оригинала по пути зеркала: префикс снимается только с имени
+	 * файла. Каталог с тем же сочетанием букв в пути не трогается — раньше
+	 * компонент делал str_replace по всему пути.
+	 */
+	public static function originalPath(string $mirrorPath): string
+	{
+		$name = basename($mirrorPath);
+		if(str_starts_with($name, static::FIND_PREFIX_FILE))
+		{
+			$name = substr($name, strlen(static::FIND_PREFIX_FILE));
+		}
 
-        return $dir . '/' . $name;
-    }
+		return dirname($mirrorPath).'/'.$name;
+	}
 
-    /** Сколько маркеров правки в тексте (сумма по всем вариантам). */
-    public static function countChangeMarkers(string $content): int
-    {
-        $count = 0;
-        foreach (self::changeMarkers() as $marker) {
-            $count += substr_count($content, $marker);
-        }
+	/** Сколько маркеров правки в тексте (сумма по всем вариантам). */
+	public static function countChangeMarkers(string $content): int
+	{
+		$count = 0;
+		foreach(static::changeMarkers() as $marker)
+		{
+			$count += substr_count($content, $marker);
+		}
 
-        return $count;
-    }
+		return $count;
+	}
 
-    /**
-     * Нужно ли переприменить правку: оригинал разошёлся с зеркалом.
-     *
-     * Эвристика (историческая, сохранена 1:1 из компонента): «правка на месте»
-     * (нужды в фиксе нет) только если оба файла есть, размеры совпадают И в
-     * оригинале присутствует хотя бы один маркер правки. Иначе — нужен фикс:
-     * оригинал затёрт обновлением, или размеры разошлись, или маркеров нет.
-     *
-     * @param bool $oriExists  существует ли оригинал
-     * @param bool $chgExists  существует ли зеркало
-     * @param int  $oriSize    размер оригинала (байт)
-     * @param int  $chgSize    размер зеркала (байт)
-     * @param int  $oriMarkers число маркеров правки в оригинале
-     * @return bool true — правку нужно переприменить (drift)
-     */
-    public static function needFix(
-        bool $oriExists,
-        bool $chgExists,
-        int $oriSize,
-        int $chgSize,
-        int $oriMarkers
-    ): bool {
-        if (!$oriExists || !$chgExists) {
-            return true;
-        }
-        if ($oriSize !== $chgSize) {
-            return true;
-        }
+	/**
+	 * Файлы совпадают содержимым.
+	 *
+	 * До 2.0.0 сравнивался только размер: обновление, заменившее в файле
+	 * символ на символ, выглядело «правкой на месте». Размер остаётся
+	 * первой, дешёвой проверкой, содержимое — второй.
+	 */
+	public static function isSameContent(string $left, string $right): bool
+	{
+		if(!is_file($left) || !is_file($right))
+		{
+			return false;
+		}
 
-        return !($oriMarkers > 0);
-    }
+		if(filesize($left) !== filesize($right))
+		{
+			return false;
+		}
+
+		return hash_file('sha256', $left) === hash_file('sha256', $right);
+	}
+
+	/**
+	 * Состояние правки.
+	 *
+	 * «На месте» — только если оригинал есть, совпадает с зеркалом и в нём
+	 * есть маркер. Порядок проверок задаёт, что покажет страница: пропавший
+	 * файл важнее разошедшегося, разошедшийся — важнее непомеченного.
+	 */
+	public static function getStatus(bool $originalExists, bool $isSame, int $originalMarkers): Status
+	{
+		if(!$originalExists)
+		{
+			return Status::NoOriginal;
+		}
+
+		if(!$isSame)
+		{
+			return Status::Drift;
+		}
+
+		if($originalMarkers < 1)
+		{
+			return Status::NoMarkers;
+		}
+
+		return Status::Ok;
+	}
 }

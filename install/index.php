@@ -1,6 +1,6 @@
 <?php
 
-use Bitrix\Main\Entity\Event;
+use Bitrix\Main\Event;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\EventManager;
 use Bitrix\Main\Application;
@@ -8,7 +8,6 @@ use Bitrix\Main\ModuleManager;
 use Bitrix\Main\Result;
 use Bitrix\Main\Error;
 use Bitrix\Main\Config;
-use Bitrix\Main\Text;
 use Bitrix\Intranet\CustomSection\Entity\CustomSectionPageTable;
 use Bitrix\Intranet\CustomSection\Entity\CustomSectionTable;
 use Bitrix\Intranet\CustomSection\Entity\EO_CustomSection;
@@ -36,13 +35,19 @@ Class shef_haschangefiles
 	public $PARTNER_URI;
 	
 	/** @var string  */
-	public $PHP_MIN_VER = '8.1.0';
+	public $PHP_MIN_VER = '8.2.0';
 	/** @var string  */
 	public $NEED_MAIN_VERSION = '22.600.300';
 	/** @var array  */
-	public $NEED_MODULES = [
-		'shef.options',
-		'shef.uiclear',
+	public $NEED_MODULES = [];
+	/**
+	 * shef.options нужен не любой: страница настроек опирается на то, что
+	 * появилось в 3.0.0 (ShOptionsConfig без indexDoc).
+	 *
+	 * @var array
+	 */
+	public $NEED_MODULES_BY_VERSION = [
+		'shef.options' => '3.0.0',
 	];
 	
 	/** @var \CMain  */
@@ -101,7 +106,7 @@ Class shef_haschangefiles
 	/**
 	 * UnRegister Module
 	 *
-	 * @param array $arParams
+	 * @param array $arParams ключ savedata = 'Y' оставляет настройки модуля
 	 * @return bool
 	 * @throws \Bitrix\Main\LoaderException
 	 *
@@ -119,6 +124,22 @@ Class shef_haschangefiles
 		}
 		
 		$this->unInstallLeftMenu();
+		
+		/**
+		 * Настройки уходят вместе с модулем.
+		 *
+		 * Раньше b_option оставался нетронутым: строки снятого модуля лежали
+		 * на портале дальше, а повторная установка молча поднимала прежние
+		 * значения — «поставить начисто» было нельзя.
+		 *
+		 * Ключ savedata — уговор ядра: установщик с формой удаления кладёт
+		 * сюда ответ на «сохранить данные?». Формы у модуля нет, поэтому
+		 * умолчание — чистить; появится форма — метод её уже слушает.
+		 */
+		if(($arParams['savedata'] ?? 'N') !== 'Y')
+		{
+			Config\Option::delete($this->MODULE_ID);
+		}
 		
 		UnRegisterModule($this->MODULE_ID);
 		
@@ -309,6 +330,46 @@ Class shef_haschangefiles
 		return true;
 	}
 
+	/**
+	 * Обработчики, которые модуль регистрировал раньше, а теперь нет.
+	 *
+	 * До 2.0.0 оба обработчика жили в Integration\Shef\UiClear\Events:
+	 * пункт на верхней панели через событие shef.uiclear и кнопка на
+	 * странице обновлений через main:OnAdminContextMenuShow. Замена файлов
+	 * модуля регистрацию не снимает — снимает только деинсталляция, и только
+	 * то, что она знает. Класс оставлен заглушкой, см.
+	 * \Shef\Haschangefiles\Integration\Shef\UiClear\Events.
+	 *
+	 * @return array[]
+	 */
+	private function getLegacyEventsList(): array
+	{
+		return [
+			[
+				'from' => [
+					'module' => 'shef.uiclear',
+					'event' => 'onBitrixMenuExtInitTopPanelUserMenu'
+				],
+				'to' => [
+					'module' => $this->MODULE_ID,
+					'class' => '\Shef\Haschangefiles\Integration\Shef\UiClear\Events',
+					'function' => 'onBitrixMenuExtInitTopPanelUserMenu'
+				]
+			],
+			[
+				'from' => [
+					'module' => 'main',
+					'event' => 'OnAdminContextMenuShow'
+				],
+				'to' => [
+					'module' => $this->MODULE_ID,
+					'class' => '\Shef\Haschangefiles\Integration\Shef\UiClear\Events',
+					'function' => 'onAdminContextMenuShow'
+				]
+			],
+		];
+	}
+
 	public function UnInstallEvents(): bool
 	{
 		$eventManager = EventManager::getInstance();
@@ -322,7 +383,7 @@ Class shef_haschangefiles
 		}
 		// endregion ////
 		
-		foreach($this->getEventsList() as $event)
+		foreach(array_merge($this->getEventsList(), $this->getLegacyEventsList()) as $event)
 		{
 			$eventManager->unRegisterEventHandler(
 				$event['from']['module'],
@@ -350,12 +411,62 @@ Class shef_haschangefiles
 		return $list;
 	}
 	
+	/**
+	 * Публичные каталоги, которые модуль раскладывал раньше, а теперь нет.
+	 *
+	 * До 2.0.0 installDir копировал:
+	 *
+	 * * install/images в /bitrix/images — скриншоты к документации, которая
+	 *   теперь живёт в репозитории;
+	 * * install/local/admin в /local/admin — публичную страницу отчёта на
+	 *   шаблоне сайта, без проверки прав;
+	 * * install/components в /local/components — компонент отчёта. Теперь
+	 *   отчёт рисует страница административной части сама.
+	 *
+	 * Оставленная страница 1.x открывалась бы без проверки прав и звала
+	 * компонент 1.x, а тот требует shef.uiclear (1.0.x) или
+	 * Utils::needFix(), которого больше нет (1.1.0). Поэтому каталоги
+	 * убираются и при установке, и при удалении: на портале, обновлённом с
+	 * 1.x, иначе некому. Все три — пространство имён самого модуля, чужого
+	 * там нет.
+	 *
+	 * @return string[]
+	 */
+	private function getLegacyDirList(): array
+	{
+		return [
+			'/bitrix/images/'.$this->MODULE_ID,
+			'/local/admin/'.$this->MODULE_ID,
+			'/local/components/'.$this->MODULE_ID,
+		];
+	}
+	
+	/**
+	 * Каталог модуля — там, где он стоит на самом деле: /bitrix/modules или
+	 * /local/modules. Раньше здесь был зашитый /bitrix/modules, и модуль из
+	 * /local/modules при установке не копировал ничего.
+	 */
+	private function getModuleDir(): string
+	{
+		return dirname(__DIR__);
+	}
+	
+	/**
+	 * Заглушка страницы отчёта в /bitrix/admin. Не копируется, а пишется: путь
+	 * в ней зависит от того, где стоит модуль. Класс подключается явно — на
+	 * автозагрузку классов модуля в установщике полагаться нельзя.
+	 */
+	private function getAdminPage(): string
+	{
+		require_once $this->getModuleDir().'/lib/main/adminpage.php';
+		
+		return \Shef\Haschangefiles\Main\AdminPage::class;
+	}
+	
 	public function InstallFiles(array $arParams = []): bool
 	{
-		$this->innerConvertEncoding();
-		
 		$docRoot = Application::getDocumentRoot();
-		$fromPath = $docRoot.'/bitrix/modules/'.$this->MODULE_ID;
+		$fromPath = $this->getModuleDir();
 		$toPath = $docRoot;
 		
 		foreach($this->getDirList() as $map)
@@ -368,59 +479,14 @@ Class shef_haschangefiles
 			);
 		}
 		
+		foreach($this->getLegacyDirList() as $legacyPath)
+		{
+			\Bitrix\Main\IO\Directory::deleteDirectory($toPath.$legacyPath);
+		}
+		
+		$this->getAdminPage()::install($docRoot, $this->getModuleDir());
+		
 		return true;
-	}
-	
-	private function innerConvertEncoding(): void
-	{
-		if(!Application::isUtfMode())
-		{
-			return;
-		}
-		
-		$docRoot = Application::getDocumentRoot();
-		$fromPath = $docRoot.'/bitrix/modules/'.$this->MODULE_ID;
-		
-		$originalModuleFiles = static::getFiles(
-			$fromPath,
-			['.svn', '.hg', '.git'],
-			true
-		);
-		
-		foreach($originalModuleFiles as $file)
-		{
-			$fromFile = $fromPath.$file;
-			$toFile = $fromFile;
-			
-			if(!(
-				mb_substr($file, -4) === '.php'
-				|| mb_substr($file, -3) === '.md'
-				|| mb_substr($file, -4) === '.csv'
-				|| mb_substr($file, -4) === '.xml'
-			))
-			{
-				continue;
-			}
-			
-			$fileContents = file_get_contents($fromFile);
-			if(!$fileContents)
-			{
-				continue;
-			}
-			
-			$currentCharset = static::getStringCharset($fileContents);
-			
-			if($currentCharset === 'cp1251')
-			{
-				$fileContents = Text\Encoding::convertEncoding(
-					$fileContents,
-					'cp1251',
-					'utf8'
-				);
-			}
-			
-			file_put_contents($toFile, $fileContents);
-		}
 	}
 	
 	public function UnInstallFiles(): bool
@@ -441,48 +507,61 @@ Class shef_haschangefiles
 			return false;
 		}
 		
-		if($_ENV['COMPUTERNAME'] !== 'SH')
+		$docRoot = Application::getDocumentRoot();
+		$toPath = $docRoot;
+		
+		foreach($this->getLegacyDirList() as $legacyPath)
 		{
-			$docRoot = Application::getDocumentRoot();
-			$toPath = $docRoot;
-			
-			foreach($this->getDirList() as $map)
+			\Bitrix\Main\IO\Directory::deleteDirectory($toPath.$legacyPath);
+		}
+		
+		// Только свою заглушку: проект мог положить на её место свой файл.
+		$this->getAdminPage()::uninstall($docRoot, $this->getModuleDir());
+		
+		foreach($this->getDirList() as $map)
+		{
+			if($map['isNeedUnInstall'] === false)
 			{
-				if($map['isNeedUnInstall'] === false)
+				continue;
+			}
+			
+			if(
+				isset($map['customPathUnInstall'])
+				&& is_array($map['customPathUnInstall'])
+				&& !empty($map['customPathUnInstall'])
+			)
+			{
+				// Путь бывает и файлом: страница в /bitrix/admin — одна среди
+				// файлов всех модулей, и удалять там можно только своё.
+				foreach($map['customPathUnInstall'] as $customPath)
 				{
-					continue;
-				}
-				
-				if(
-					isset($map['customPathUnInstall'])
-					&& is_array($map['customPathUnInstall'])
-					&& !empty($map['customPathUnInstall'])
-				)
-				{
-					foreach($map['customPathUnInstall'] as $customPath)
+					if(is_file($toPath.$customPath))
 					{
-						\Bitrix\Main\IO\Directory::deleteDirectory(
-							$toPath.$customPath
-						);
+						\Bitrix\Main\IO\File::deleteFile($toPath.$customPath);
+						continue;
 					}
-				}
-				else
-				{
-					$list = [
-						$this->MODULE_ID,
-						str_replace('.', '-', $this->MODULE_ID)
-					];
 					
-					foreach($list as $moduleId)
-					{
-						\Bitrix\Main\IO\Directory::deleteDirectory(
-							$toPath.$map['to'].'/'.$moduleId
-						);
-					}
+					\Bitrix\Main\IO\Directory::deleteDirectory(
+						$toPath.$customPath
+					);
+				}
+			}
+			else
+			{
+				$list = [
+					$this->MODULE_ID,
+					str_replace('.', '-', $this->MODULE_ID)
+				];
+				
+				foreach($list as $moduleId)
+				{
+					\Bitrix\Main\IO\Directory::deleteDirectory(
+						$toPath.$map['to'].'/'.$moduleId
+					);
 				}
 			}
 		}
-		
+
 		return true;
 	}
 	// endregion ////
@@ -490,6 +569,20 @@ Class shef_haschangefiles
 	// region Install.Public ////
 	public function DoInstall(): void
 	{
+		/**
+		 * Модуль поставляется в UTF-8 и перекодировкой при установке не занимается.
+		 * На проекте в CP1251 файлы модуля остались бы в UTF-8, и весь русский
+		 * текст превратился бы в мусор уже после установки — молча.
+		 * Поэтому отказываемся ставиться сразу, а не разбираемся потом.
+		 */
+		if(!Application::isUtfMode())
+		{
+			$this->ShowForm(
+				'ERROR',
+				Loc::getMessage('SH_NEED_UTF8')
+			);
+		}
+		
 		$phpVer = phpversion();
 		
 		if(version_compare($phpVer, $this->PHP_MIN_VER, '<'))
@@ -515,6 +608,35 @@ Class shef_haschangefiles
 						'ERROR',
 						Loc::getMessage('SH_NEED_MODULES', [
 							'#NEED#' => $module
+						])
+					);
+				}
+			}
+		}
+		
+		if(
+			!empty($this->NEED_MODULES_BY_VERSION)
+			&& is_array($this->NEED_MODULES_BY_VERSION)
+		){
+			foreach($this->NEED_MODULES_BY_VERSION as $module => $ver)
+			{
+				if(
+					!ModuleManager::isModuleInstalled($module)
+					|| version_compare(
+						(string)ModuleManager::getVersion($module),
+						$ver
+					) < 0
+				)
+				{
+					$this->ShowForm(
+						'ERROR',
+						Loc::getMessage('SH_NEED_MODULES_BY_VERSION', [
+							'#URL#' => (strpos($module, '.') === false
+								? 'https://www.1c-bitrix.ru/products/cms/versions.php?module='.$module
+								: 'https://marketplace.1c-bitrix.ru/solutions/'.$module.'/'
+							),
+							'#NEED#' => $module,
+							'#VER#' => $ver
 						])
 					);
 				}
@@ -613,84 +735,6 @@ Class shef_haschangefiles
 	// endregion /////
 	
 	// region Tools ////
-	private static function getFiles(
-		string $path,
-		array $filter = [],
-		bool $isAllFiles = false,
-		bool $recursive = false
-	): array
-	{
-		static $len;
-		if(!$recursive || !$len)
-		{
-			$len = mb_strlen($path);
-		}
-		
-		$retVal = [];
-		if($dir = opendir($path))
-		{
-			while(false !== $item = readdir($dir))
-			{
-				if(in_array($item, array_merge(
-					['.', '..', '.svn', '.hg', '.git'],
-					$filter
-				)))
-				{
-					continue;
-				}
-				
-				if(is_dir($file = $path.'/'.$item))
-				{
-					$retVal = array_merge(
-						$retVal,
-						static::getFiles(
-							$file,
-							$filter,
-							$isAllFiles,
-							true
-						)
-					);
-				}
-				else
-				{
-					if($isAllFiles || substr($file, -4) == '.php')
-					{
-						$retVal[] = str_replace(
-							'\\',
-							'/',
-							substr($file, $len)
-						);
-					}
-				}
-			}
-			
-			closedir($dir);
-		}
-		
-		return $retVal;
-	}
-	
-	private static function getStringCharset(string $str): string
-	{
-		if(preg_match("/[\xe0\xe1\xe3-\xff]/", $str))
-		{
-			return 'cp1251';
-		}
-		
-		$str0 = Text\Encoding::convertEncoding(
-			$str,
-			'utf8',
-			'cp1251'
-		);
-		
-		if(preg_match("/[\xe0\xe1\xe3-\xff]/", $str0, $regs))
-		{
-			return 'utf8';
-		}
-		
-		return 'ascii';
-	}
-	
 	private function checkChildModules(): Result
 	{
 		$result = new Result();

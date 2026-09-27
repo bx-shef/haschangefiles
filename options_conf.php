@@ -1,20 +1,19 @@
 <?php declare(strict_types=1);
 
-use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
 use Shef\Options\Main\Options;
+use Shef\Haschangefiles\Integration\Main\AdminMenu;
 
 /**
  * Опции для страницы настроек
- * 
+ *
  * языковой файл options.php
  *
  * Tab(prefix)->Option(code) ~> код свойства: prefix_code
  */
 
 $response = ShOptionsConfig::getInstance(
-	moduleId: 'shef.haschangefiles',
-	indexDoc: 'README.md'
+	moduleId: 'shef.haschangefiles'
 );
 
 if(!$response->isSuccess())
@@ -29,6 +28,13 @@ $options->addTab(
 	(new Options\Tab('PRJ'))
 		->setName(Loc::getMessage($options->moduleId.'_TAB_PRJ_NAME'))
 		->setTitle(Loc::getMessage($options->moduleId.'_TAB_PRJ_TITLE'))
+		->addOption(
+			(new Options\RowInfo('Report'))
+				->setDescription(Loc::getMessage($options->moduleId.'_TAB_PRJ_REPORT', [
+					'#URL#' => AdminMenu::getUrlList(LANGUAGE_ID),
+				]))
+				->setType(Options\TypeUIAlert::Note)
+		)
 		->addOption(
 			(new Options\RowInfo('WARNING_PRJ'))
 				->setDescription(Loc::getMessage($options->moduleId.'_TAB_PRJ_WARNING'))

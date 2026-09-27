@@ -2,148 +2,42 @@
 
 namespace Shef\Haschangefiles\Integration\Shef\UiClear;
 
-use Bitrix\Main\Loader;
-use Bitrix\Main\Result;
-use Bitrix\Main\Error;
+use Bitrix\Main\Event;
 use Bitrix\Main\EventResult;
-use Bitrix\Main\Page\Asset;
-use Bitrix\Main\UI\Extension;
-use Bitrix\Main\Localization\Loc;
-use Shef\Options\TraitList;
 use Shef\Haschangefiles\Main\Constants;
 
-Loc::loadMessages(__FILE__);
-
-/*/
 /**
- * Обработка событий
+ * Заглушка для порталов, обновлённых с 1.x.
+ *
+ * До 2.0.0 здесь жили оба обработчика модуля: пункт «[SH] Правки ядра» на
+ * верхней панели через событие shef.uiclear и кнопка с подтверждением на
+ * странице обновлений через main:OnAdminContextMenuShow. С 2.0.0 от
+ * shef.uiclear модуль не зависит: пункт живёт в меню административной части
+ * (admin/menu.php), а обработчик ядра — в Integration\Main\Events.
+ *
+ * Но регистрация обработчиков в b_module_to_module при замене файлов модуля
+ * никуда не девается — её снимает только деинсталляция. Удали мы класс, и
+ * событие звало бы то, чего нет. Поэтому класс остаётся: на shef.uiclear
+ * честно отвечает «мне нечего добавить», а страницу обновлений передаёт
+ * новому обработчику. Установщик снимает обе регистрации при удалении
+ * (\shef_haschangefiles::getLegacyEventsList()).
+ *
+ * Удалять вместе со следующей мажорной версией, когда порталов на 1.x не
+ * останется.
  */
 class Events
 {
-	use TraitList\Events;
-	use TraitList\EventResponse;
-
-	protected static function getModuleId(): string
+	public static function onBitrixMenuExtInitTopPanelUserMenu(Event $event): EventResult
 	{
-		return Constants::MODULE_ID;
-	}
-	
-	/**
-	 * Пункт меню в расширениях
-	 *
-	 * @param \Bitrix\Main\Event $event
-	 * @return EventResult
-	 */
-	public static function onBitrixMenuExtInitTopPanelUserMenu(\Bitrix\Main\Event $event): EventResult
-	{
-		return static::returnMainEventSuccess(
-			(new Result())->setData([
-				'items' => [
-					[
-						'TITLE' => Loc::getMessage(Constants::MODULE_ID.'_TOOLS_HAS_CHANGE_BTN_TITLE'),
-						'PUBLIC_URL' => Manager::getFileUrl(),
-						'IS_FOR_ADMIN' => true
-					]
-				]
-			]),
-			__FUNCTION__
+		return new EventResult(
+			EventResult::UNDEFINED,
+			null,
+			Constants::MODULE_ID
 		);
 	}
-	
-	/**
-	 * Страница обновлений
-	 *
-	 * @param array|null $items
-	 * @return void
-	 * @throws \Bitrix\Main\LoaderException
-	 */
+
 	public static function onAdminContextMenuShow(?array &$items = []): void
 	{
-		if(!Loader::includeModule('shef.haschangefiles'))
-		{
-			return;
-		}
-		$server = \Bitrix\Main\Application::getInstance()->getContext()->getServer();
-		$request = \Bitrix\Main\Application::getInstance()->getContext()->getRequest();
-
-		if (
-			$server->getRequestMethod() === 'GET'
-			&& $request->getRequestedPage() === '/bitrix/admin/update_system.php'
-		)
-		{
-			Extension::load(["ui.dialogs.messagebox"]);
-
-			$items[] = array(
-				"TEXT" => Loc::getMessage(Constants::MODULE_ID.'_TOOLS_HAS_CHANGE_BTN_TITLE'),
-				"LINK" => "javascript:window.open('".Manager::getFileUrl()."', '_blank').focus()",
-				"TITLE" => "",
-				"ICON" => "adm-btn",
-				"SORT" => 0
-			);
-			
-			$confirm = new \Shef\Options\Options\SmartStd();
-			$confirm->title = Loc::getMessage(Constants::MODULE_ID.'_TOOLS_HAS_CHANGE_UPDATE_CONFIRM_TITLE');
-			$confirm->message = Loc::getMessage(Constants::MODULE_ID.'_TOOLS_HAS_CHANGE_UPDATE_CONFIRM_MESSAGE', [
-				'#DANGER_COLOR#' => \Shef\UiClear\Css\Color::danger->value,
-				'#URL#' => Manager::getFileUrl()
-			]);
-			$confirm->btnSuccess = Loc::getMessage(Constants::MODULE_ID.'_TOOLS_HAS_CHANGE_UPDATE_CONFIRM_BTN_ACTION_SUCCESS');
-
-
-			ob_start();
-			?>
-<script>
-BX.ready(() => {
-	let functionClick = function(event){
-
-		let typeClick = 'global';
-		if(event.target.dataset.typeClick === 'selected')
-		{
-			typeClick = 'selected';
-		}
-		BX.UI.Dialogs.MessageBox.confirm(
-			"<?=$confirm->message?>",
-			"<?=$confirm->title?>",
-			(messageBox, button) =>
-			{
-				button.context.close();
-
-				if(typeClick === 'selected')
-				{
-					InstallUpdatesSel();
-				}
-				else
-				{
-					InstallUpdates();
-				}
-			},
-			"<?=$confirm->btnSuccess?>",
-			(messageBox, button) =>
-			{
-				button.context.close();
-			}
-		);
-	};
-
-	let updateBtn = BX('install_updates_button');
-	if(!!updateBtn)
-	{
-		updateBtn.dataset.typeClick = 'global';
-		updateBtn.onclick = functionClick.bind(this);
-	}
-
-	let updateSelBtn = BX('install_updates_sel_button');
-	if(!!updateSelBtn)
-	{
-		updateSelBtn.dataset.typeClick = 'selected';
-		updateSelBtn.onclick = functionClick.bind(this);
-	}
-});
-</script>
-			<?php
-			$script = ob_get_contents();
-			ob_end_clean();
-			Asset::getInstance()->addString($script);
-		}
+		\Shef\Haschangefiles\Integration\Main\Events::onAdminContextMenuShow($items);
 	}
 }

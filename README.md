@@ -1,83 +1,92 @@
 # shef.haschangefiles
-Учёт исправленных файлов ядра.
 
-> Добавляет ссылку в меню пользователя в закладку Расширения на [страницу учета правок](/local/admin/shef.haschangefiles/list.php)
-> 
-> В админке на странице [установки обновления](/bitrix/admin/update_system.php) предупреждает  о необходимости контролировать изменения.
+Модуль Битрикс24 «коробки» и БУС для учёта правок ядра. Правка ядра — файл
+Битрикса, изменённый руками; обновление платформы перезапишет его молча.
+Модуль помнит, **какие** файлы правили, и после обновления показывает, какие
+правки надо вернуть: отчётом в административной части и проверкой из
+консоли с кодом возврата.
 
-* [change log](CHANGELOG.md)
+Опирается на [shef.options](https://github.com/bx-shef/options): его нужно
+поставить первым.
 
-## Установка
-После установки нужно сбросить кеш.
+# Что нужно для установки
 
-## Настройки
-В настройках указывается путь к проекту на машине разработчика, для реализации открытия кода по клику в _PhpStorm_.
+| | |
+|---|---|
+| PHP | 8.2 и выше |
+| Главный модуль Битрикс | 22.600.300 и выше |
+| Модуль `shef.options` | 3.0.0 и выше |
+| Кодировка портала | **только UTF-8** |
+| Расширение PHP | `mbstring` |
 
-## Принцип работы
-Пусть есть файл `somecode/test.php`
+# Установка
 
-### 1. Вносим правку
-Обрамляем изменения блоком `// change ////` ... `// change stop ////`
+**Порядок шагов важен:** сначала `shef.options`, потом файлы этого модуля, потом
+установка в административном разделе.
 
-```php
-<?php
-function test(): void
-{
-  // some code ////
-  foreach($list as $item)
-  {
-    // change ////
-    // $item['NAME'] = $item['CODE']; ////
-    $item['NAME'] = sprintf('[%s] %s', $item['ID'], $item['CODE']);
-    // change stop ////
-  }
-  // some code //// 
-}
-?>
+## Через Composer
+
+```bash
+composer require bxshef/haschangefiles
 ```
 
-### 2. Создаем копию
-Файл копируем -> `somecode/has-change_test.php`, выгружаем на сервер.
+Модуль развернётся в `bitrix/modules/shef.haschangefiles/` сам, вместе с ним
+приедет `bxshef/options`. Composer 2.2+ требует разрешить плагин
+раскладки — один раз, в `composer.json` проекта:
 
-Теперь у нас 2 одинаковые файла:
+```json
+{
+	"config": {
+		"allow-plugins": {
+			"composer/installers": true
+		}
+	}
+}
+```
 
-* `somecode/test.php`
-* `somecode/has-change_test.php`
+## Из архива
 
-Если их в _PhpStorm_ выделить и нажать _Ctrl+B_ то сравнение файлов покажет что они одинаковые.
+Скачайте `shef.haschangefiles.zip` со [страницы релизов](https://github.com/bx-shef/haschangefiles/releases)
+и распакуйте в `bitrix/modules/`. Должно получиться
+`bitrix/modules/shef.haschangefiles/` — именно через точку.
 
-### 3. Загружаем обновления
-Обновления Битрикс перетирает файл `somecode/test.php`
+## Дальше — в административном разделе
 
-Теперь у нас 2 разных файла:
+1. **Настройки → Marketplace → Установленные решения** → «[SH] Правки ядра» →
+   **Установить**.
+2. По желанию — **Настройки → Настройки продукта → Настройки модулей →
+   [SH] Правки ядра** → вкладка «PhpStorm»: имя проекта и корень сайта в нём.
+   Тогда даты в отчёте открывают файл в PhpStorm через JetBrains Toolbox.
 
-* `somecode/test.php` -> обновленный код
-* `somecode/has-change_test.php` -> старый код с правками
+# Как пользоваться
 
-![shef.haschangefiles::страница учета правок](/bitrix/images/shef.haschangefiles/docs/sf1.png)
+1. Правку в файле ядра обрамляете блоком `// change ////` … `// change stop ////`.
+2. Файл с правкой копируете рядом как `has-change_<имя>` — это зеркало.
+3. После обновления Битрикса открываете **Настройки → Правки ядра → Учёт
+   правок**: «Восстановить» — файл разошёлся с зеркалом, правку надо вернуть
+   и снова сохранить копию.
 
-[Страница учета правок](/local/admin/shef.haschangefiles/list.php) показывает наличие расхождений.
+Перед установкой обновлений модуль напоминает сам: на странице
+**Обновление платформы** кнопки «Установить обновления» сначала спрашивают,
+зафиксированы ли правки.
 
-### 4. Восстанавливаем правки
-Открываем [страницу учета правок](/local/admin/shef.haschangefiles/list.php)
+Из консоли — то же, ответом кодом возврата:
 
-Кликаем на файл `somecode/test.php`, он откроется в _PhpStorm_ (если верно настроили модуль).
+```bash
+php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php   # 0 — всё на месте, 1 — есть что вернуть
+```
 
-Выкачиаем с сервера обновленный файл `somecode/test.php`.
+# Документация
 
-Выделяем 2 файла и `somecode/test.php` и `somecode/has-change_test.php`, нажимаем _Ctrl+B_ для открытия окна сравнения. 
+Вся документация — в репозитории:
 
-Из `somecode/has-change_test.php` в `somecode/test.php` переносим правки.
+* [как вести правки ядра](https://github.com/bx-shef/haschangefiles/blob/main/docs/1_usage.md)
+* [проверка из консоли](https://github.com/bx-shef/haschangefiles/blob/main/docs/2_cli.md)
+* [безопасность](https://github.com/bx-shef/haschangefiles/blob/main/docs/security.md)
+* [запускаемые примеры](https://github.com/bx-shef/haschangefiles/blob/main/examples/README.md)
+* [проверка на портале](https://github.com/bx-shef/haschangefiles/blob/main/docs/portal-check.md)
+* [change log](https://github.com/bx-shef/haschangefiles/blob/main/CHANGELOG.md)
 
-![shef.haschangefiles::перенос правок](/bitrix/images/shef.haschangefiles/docs/sf2.png)
+# Лицензия
 
-Создаем копию `somecode/test.php` в `somecode/has-change_test.php`.
-
-Выгружаем на сервер.
-
-Теперь у нас снова 2 одинаковые файла. 
-
-[Страница учета правок](/local/admin/shef.haschangefiles/list.php) показывает отсутствие расхождений.
-
-
-
+[MIT](https://github.com/bx-shef/haschangefiles/blob/main/LICENSE)
