@@ -1,0 +1,38 @@
+{
+	"name": "bxshef/haschangefiles",
+	"description": "Битрикс24 (коробка): учёт исправленных файлов ядра — какие правки перезаписало обновление и что вернуть",
+	"type": "bitrix-module",
+	"license": "MIT",
+	"keywords": [
+		"bitrix",
+		"Bitrix24",
+		"local-module",
+		"core-patches",
+		"update"
+	],
+	"homepage": "https://github.com/bx-shef/haschangefiles",
+	"authors": [
+		{
+			"name": "Igor Shevchik",
+			"email": "offer@bx-shef.by",
+			"homepage": "https://bx-shef.by/"
+		}
+	],
+	"support": {
+		"issues": "https://github.com/bx-shef/haschangefiles/issues",
+		"source": "https://github.com/bx-shef/haschangefiles"
+	},
+	"minimum-stability": "stable",
+	"require": {
+		"php": ">=8.2.0",
+		"ext-mbstring": "*",
+		"composer/installers": "^1.0 || ^2.0",
+		"bxshef/options": "^3.0"
+	},
+	"extra": {
+		"installer-name": "shef.haschangefiles",
+		"branch-alias": {
+			"dev-main": "2.x-dev"
+		}
+	}
+}
