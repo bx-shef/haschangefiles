@@ -143,19 +143,29 @@ if(0 !== $code)
 Check::same('манифест сходится с навыками', $code, 0);
 
 // Каждый навык обязан быть в манифесте: иначе получатель его не проверит.
-$listed = [];
-
-foreach(file($root.'/.claude/skills/MANIFEST') ?: [] as $line)
+// Манифестов два: MANIFEST — копия линейки из shef.options, LOCAL.MANIFEST —
+// навыки про сам shef.haschangefiles (shef-core-change и сосед), их источник здесь.
+$paths = static function(string $file): array
 {
-	$line = trim($line);
+	$list = [];
 
-	if('' === $line || str_starts_with($line, '#'))
+	foreach(is_file($file) ? (file($file) ?: []) : [] as $line)
 	{
-		continue;
+		$line = trim($line);
+
+		if('' === $line || str_starts_with($line, '#'))
+		{
+			continue;
+		}
+
+		$list[] = preg_split('/\s+/', $line, 2)[1] ?? '';
 	}
 
-	$listed[] = preg_split('/\s+/', $line, 2)[1] ?? '';
-}
+	return $list;
+};
+
+$listed = $paths($root.'/.claude/skills/MANIFEST');
+$local = $paths($root.'/.claude/skills/LOCAL.MANIFEST');
 
 $missing = [];
 
@@ -163,13 +173,23 @@ foreach($skills as $path)
 {
 	$relative = basename(dirname($path)).'/SKILL.md';
 
-	if(!in_array($relative, $listed, true))
+	if(!in_array($relative, $listed, true) && !in_array($relative, $local, true))
 	{
 		$missing[] = $relative;
 	}
 }
 
-Check::same('каждый навык перечислен в манифесте', $missing, []);
-Check::same('sync.sh перечислен в манифесте', in_array('sync.sh', $listed, true), true);
+Check::same('каждый навык перечислен в одном из манифестов', $missing, []);
+Check::same('sync.sh перечислен в манифесте линейки', in_array('sync.sh', $listed, true), true);
+Check::same('локальные навыки не пересекаются с навыками линейки', array_values(array_intersect($listed, $local)), []);
+
+// Навыки про сам модуль: их классы проверяет docs_test.php этого
+// репозитория, а наличие — здесь, чтобы раскладка не могла их потерять.
+$own = ['shef-core-change', 'shef-restore-core-changes'];
+Check::same(
+	'навыки shef.haschangefiles — локальные и на месте',
+	array_values(array_filter($own, static fn(string $name): bool => !in_array($name.'/SKILL.md', $local, true))),
+	[]
+);
 
 Check::finish();

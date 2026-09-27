@@ -107,11 +107,11 @@ git ls-remote --heads origin
 успешной сборки. Подробности и второй вход (пуш тега) —
 в [docs/build-and-install.md](docs/build-and-install.md).
 
-## Навыки агента — не здесь
+## Навыки агента
 
-`.claude/skills/` — копия из [bx-shef/options](https://github.com/bx-shef/options),
-её раскладывает `sync.sh`. Навык правят **в shef.options**, потом раскладывают
-сюда:
+Навыки линейки в `.claude/skills/` — копия из
+[bx-shef/options](https://github.com/bx-shef/options), её раскладывает
+`sync.sh`. Такой навык правят **в shef.options**, потом раскладывают сюда:
 
 ```bash
 ../options/.claude/skills/sync.sh --to .
@@ -121,6 +121,14 @@ git ls-remote --heads origin
 Правка копии на месте будет затёрта следующей раскладкой, а до неё — поймана:
 `tests/skills_test.php` сверяет копию с её `MANIFEST`, задача `Skills` в CI — с
 источником.
+
+Локальные навыки — `shef-core-change` и `shef-restore-core-changes` — правят
+здесь, после правки пересобирают `LOCAL.MANIFEST`:
+
+```bash
+.claude/skills/sync.sh --local
+./build.sh --check
+```
 
 ## Решения владельца
 
