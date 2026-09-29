@@ -61,8 +61,18 @@ $fail = static function(string $message): never
  */
 $normalize = static function(string $path): string
 {
+	$path = str_replace('\\', '/', $path);
+
+	// Диск Windows (C:) — часть корня, а не каталог.
+	$drive = '';
+	if(1 === preg_match('#^[A-Za-z]:#', $path))
+	{
+		$drive = substr($path, 0, 2);
+		$path = substr($path, 2);
+	}
+
 	$parts = [];
-	foreach(explode('/', str_replace('\\', '/', $path)) as $part)
+	foreach(explode('/', $path) as $part)
 	{
 		if($part === '' || $part === '.')
 		{
@@ -78,25 +88,28 @@ $normalize = static function(string $path): string
 		$parts[] = $part;
 	}
 
-	return '/'.implode('/', $parts);
+	return $drive.'/'.implode('/', $parts);
 };
+
+$isAbsolute = static fn(string $path): bool => 1 === preg_match('#^(?:/|\\\\|[A-Za-z]:[/\\\\])#', $path);
 
 // Без DOCUMENT_ROOT — от пути, которым скрипт запустили: __DIR__ уже
 // разрешён, и у модуля-ссылки вёл бы в чужой каталог рядом с настоящим.
 // Скрипт подключён чужим (обёртка в CI) — SCRIPT_FILENAME про обёртку, тогда
-// от своего файла.
+// от своего файла. Этот путь уже разрешён: модуль-ссылке из обёртки нужен
+// DOCUMENT_ROOT.
 $script = (string)($_SERVER['SCRIPT_FILENAME'] ?? '');
 if($script === '' || realpath($script) !== realpath(__FILE__))
 {
 	$script = __FILE__;
 }
-elseif(!str_starts_with($script, '/'))
+elseif(!$isAbsolute($script))
 {
 	$script = getcwd().'/'.$script;
 }
 
 $documentRoot = trim((string)getenv('DOCUMENT_ROOT'));
-$root = $normalize($documentRoot !== '' ? (str_starts_with($documentRoot, '/') ? $documentRoot : getcwd().'/'.$documentRoot) : dirname($normalize($script), 5));
+$root = $normalize($documentRoot !== '' ? ($isAbsolute($documentRoot) ? $documentRoot : getcwd().'/'.$documentRoot) : dirname($normalize($script), 5));
 
 // Каталог без /bitrix — не сайт: «зеркал 0, код 0» на опечатке в пути
 // выглядело бы пройденной проверкой.
