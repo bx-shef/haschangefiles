@@ -112,6 +112,9 @@ class AdminPage
 		$temp = $target.'.'.getmypid().'.tmp';
 		if(false === file_put_contents($temp, $content))
 		{
+			// Кончилось место — недописанный файл не оставлять: он лежал бы в
+			// /bitrix/admin, и никто бы его не убрал.
+			@unlink($temp);
 			return false;
 		}
 

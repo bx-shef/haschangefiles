@@ -159,6 +159,30 @@ exec(
 );
 Check::same('модуль в /bitrix/modules — корень найден сам', [$code, str_contains(implode(PHP_EOL, $output), 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
 
+Check::group('как скрипт ни позови');
+
+$runFrom = static function(string $dir, string $command): array
+{
+	$output = [];
+	exec('cd '.escapeshellarg($dir).' && env -u DOCUMENT_ROOT '.$command.' 2>&1', $output, $code);
+
+	return ['code' => $code, 'out' => implode(PHP_EOL, $output)];
+};
+$php = escapeshellarg(PHP_BINARY);
+
+$result = $runFrom($module, $php.' ./cli/check-core-changes.php');
+Check::same('из каталога модуля через ./', [$result['code'], str_contains($result['out'], 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
+
+$result = $runFrom($module.'/cli', $php.' ../cli/check-core-changes.php');
+Check::same('из cli/ через ../', [$result['code'], str_contains($result['out'], 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
+
+// Обёртка CI подключает скрипт: SCRIPT_FILENAME про обёртку, а корень — от
+// самого скрипта.
+file_put_contents($site.'-wrapper.php', '<?php require '.var_export($module.'/cli/check-core-changes.php', true).';');
+$result = $runFrom(sys_get_temp_dir(), $php.' '.escapeshellarg($site.'-wrapper.php'));
+Check::same('через обёртку', [$result['code'], str_contains($result['out'], 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
+unlink($site.'-wrapper.php');
+
 // Модуль — символическая ссылка на каталог вне сайта. Корень всё равно
 // тот, откуда скрипт запустили, а не соседний с настоящим местом модуля.
 $external = $site.'-ext/shef.haschangefiles';
@@ -180,6 +204,30 @@ Check::same(
 	[1, true, false]
 );
 exec('rm -rf '.escapeshellarg($site.'-ext'));
+
+Check::group('BASE_DIR, равный корню, — не прячет ядро');
+
+foreach(['/.', '.', '/'] as $base)
+{
+	$result = $run(['DOCUMENT_ROOT' => $site, 'BASE_DIR' => $base]);
+	Check::same('BASE_DIR='.$base.' — ядро обойдено', [$result['code'], str_contains($result['out'], 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
+}
+
+Check::group('/bitrix — ссылка на общее ядро');
+
+$shared = $site.'-shared';
+mkdir($shared.'/site/', 0777, true);
+rename($site.'/bitrix', $shared.'/bitrix');
+symlink($shared.'/bitrix', $site.'/bitrix');
+
+$result = $run(['DOCUMENT_ROOT' => $site, 'BASE_DIR' => '/bitrix']);
+Check::same('BASE_DIR=/bitrix — обходится, код по делу', [$result['code'], str_contains($result['out'], 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
+$result = $run(['DOCUMENT_ROOT' => $site]);
+Check::same('без BASE_DIR — ядро по ссылке тоже обходится', [$result['code'], str_contains($result['out'], 'DRIFT        /bitrix/modules/crm/a.php')], [1, true]);
+
+unlink($site.'/bitrix');
+rename($shared.'/bitrix', $site.'/bitrix');
+exec('rm -rf '.escapeshellarg($shared));
 
 // region Уборка ////
 exec('rm -rf '.escapeshellarg($site));

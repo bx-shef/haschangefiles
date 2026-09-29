@@ -55,20 +55,52 @@ $fail = static function(string $message): never
 	exit(2);
 };
 
+/**
+ * «.» и «..» в пути — без разрешения ссылок: realpath() увёл бы модуль-ссылку
+ * в его настоящий каталог, а нужен путь, как его видит сайт.
+ */
+$normalize = static function(string $path): string
+{
+	$parts = [];
+	foreach(explode('/', str_replace('\\', '/', $path)) as $part)
+	{
+		if($part === '' || $part === '.')
+		{
+			continue;
+		}
+
+		if($part === '..')
+		{
+			array_pop($parts);
+			continue;
+		}
+
+		$parts[] = $part;
+	}
+
+	return '/'.implode('/', $parts);
+};
+
 // Без DOCUMENT_ROOT — от пути, которым скрипт запустили: __DIR__ уже
 // разрешён, и у модуля-ссылки вёл бы в чужой каталог рядом с настоящим.
-$script = (string)($_SERVER['SCRIPT_FILENAME'] ?? __FILE__);
-if(!str_starts_with($script, '/'))
+// Скрипт подключён чужим (обёртка в CI) — SCRIPT_FILENAME про обёртку, тогда
+// от своего файла.
+$script = (string)($_SERVER['SCRIPT_FILENAME'] ?? '');
+if($script === '' || realpath($script) !== realpath(__FILE__))
+{
+	$script = __FILE__;
+}
+elseif(!str_starts_with($script, '/'))
 {
 	$script = getcwd().'/'.$script;
 }
 
 $documentRoot = trim((string)getenv('DOCUMENT_ROOT'));
-$root = realpath($documentRoot !== '' ? $documentRoot : dirname($script, 5));
+$root = $normalize($documentRoot !== '' ? (str_starts_with($documentRoot, '/') ? $documentRoot : getcwd().'/'.$documentRoot) : dirname($normalize($script), 5));
 
 // Каталог без /bitrix — не сайт: «зеркал 0, код 0» на опечатке в пути
 // выглядело бы пройденной проверкой.
-if($root === false || !is_dir($root.'/bitrix'))
+if(!is_dir($root) || !is_dir($root.'/bitrix'))
 {
 	$fail('Не найден корень сайта (каталог с /bitrix): задайте DOCUMENT_ROOT');
 }
@@ -82,11 +114,15 @@ if($showDiff && !function_exists('shell_exec'))
 
 $scope = Scanner::getScope($root);
 
+// BASE_DIR — от корня, без разрешения ссылок: /bitrix бывает ссылкой на
+// общее ядро нескольких сайтов, и это всё ещё «ядро этого сайта». Корень
+// целиком — обычные разделы: иначе пропуск /bitrix из публичной части
+// спрятал бы ядро.
 $baseRel = trim((string)getenv('BASE_DIR'));
-if($baseRel !== '' && trim($baseRel, '/') !== '')
+$baseDir = $baseRel !== '' ? $normalize($root.'/'.$baseRel) : $root;
+if($baseDir !== $root)
 {
-	$baseDir = realpath($root.'/'.trim($baseRel, '/'));
-	if($baseDir === false || !is_dir($baseDir) || ($baseDir !== $root && !str_starts_with($baseDir, $root.'/')))
+	if(!str_starts_with($baseDir, $root.'/') || !is_dir($baseDir))
 	{
 		$fail('Нет каталога BASE_DIR внутри корня сайта: '.$printable($baseRel));
 	}

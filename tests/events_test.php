@@ -8,6 +8,9 @@
  * * кнопка и подтверждение — только на странице обновлений, только на GET и
  *   только администратору: main:OnAdminContextMenuShow зовётся на каждой
  *   странице административной части с контекстным меню;
+ * * один раз за запрос, даже если на портале обе регистрации — прежняя, на
+ *   класс 1.x, и новая: установщик снимает прежнюю по строке, а строки 1.x
+ *   сверить не с чем;
  * * заглушка 1.x передаёт вызов новому обработчику, а не падает;
  * * тексты уходят в скрипт через json_encode. В 1.x они подставлялись в
  *   кавычки строкой: кавычка в переводе ломала скрипт, и кнопка «Установить
@@ -31,6 +34,7 @@ Loc::loadLangFile($root.'/lang/ru/lib/integration/main/events.php');
 
 $call = static function(string $page, bool $isAdmin, string $method = 'GET', string $handler = Events::class): array
 {
+	Events::reset();
 	Asset::$strings = [];
 	Extension::$loaded = [];
 	Context::$requestedPage = $page;
@@ -57,6 +61,13 @@ Check::same('в новой вкладке, без javascript:', [$items[1]['LINK
 Check::same('подпись', $items[1]['TEXT'], 'Правки ядра');
 Check::same('скрипт подтверждения добавлен', count(Asset::$strings), 1);
 Check::same('диалог ядра подключён', Extension::$loaded, ['ui.dialogs.messagebox']);
+
+Check::group('один раз за запрос');
+
+$items = [];
+Events::onAdminContextMenuShow($items);
+\Shef\Haschangefiles\Integration\Shef\UiClear\Events::onAdminContextMenuShow($items);
+Check::same('вторая регистрация ничего не добавляет', [count($items), count(Asset::$strings)], [0, 1]);
 
 Check::group('заглушка 1.x');
 

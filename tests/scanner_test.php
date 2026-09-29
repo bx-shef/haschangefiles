@@ -102,6 +102,16 @@ Check::same('без маркеров', Utils::countChangeMarkers("<?php\n// пр
 // засчитывается. Так было всегда; держим, чтобы это не поменялось молча.
 Check::same('«// changed» — тоже маркер', Utils::countChangeMarkers("<?php\n// changed by vendor\n"), 1);
 
+Check::group('маркеры из файла — кусками');
+
+$markerFile = $put('/tmp-markers.txt', str_repeat('x', 7).'// change'.str_repeat('y', 5).'//cahnge// change');
+Check::same('кусками — столько же, сколько целиком', array_map(
+	static fn(int $chunk): ?int => Utils::countChangeMarkersInFile($markerFile, $chunk),
+	[1, 3, 8, 9, 1048576]
+), [3, 3, 3, 3, 3]);
+Check::same('нет файла — null', Utils::countChangeMarkersInFile($site.'/нет.php'), null);
+unlink($markerFile);
+
 Check::group('путь оригинала');
 
 Check::same('префикс снимается с имени', Utils::originalPath('/www/a/has-change_b.php'), '/www/a/b.php');
@@ -164,20 +174,60 @@ symlink($site, $site.'/bitrix/modules/loop');
 symlink($site.'/crm', $site.'/crm-link');
 Check::same('по символическим ссылкам на каталоги не ходим', count(Scanner::find($site)), $before);
 
-// Нечитаемый каталог. Под root права не действуют — проверить нечем, и это
-// печатается, а не проходит молча.
-if(function_exists('posix_geteuid') && posix_geteuid() !== 0)
+// Нечитаемые каталог и файл. Под root права не действуют, и проверка
+// выглядела бы пройденной — поэтому под root она идёт от имени nobody
+// (setpriv), а нечем сменить пользователя — тест краснеет.
+$closed = sys_get_temp_dir().'/shef-haschangefiles-closed-'.getmypid();
+mkdir($closed.'/lib', 0777, true);
+foreach(['status', 'utils', 'changefile', 'scanner'] as $class)
 {
-	mkdir($site.'/closed');
-	$put('/closed/has-change_x.php', $edited);
-	chmod($site.'/closed', 0000);
-	Check::same('нечитаемый каталог пропускается', count(Scanner::find($site)), $before);
-	chmod($site.'/closed', 0777);
+	copy($root.'/lib/main/'.$class.'.php', $closed.'/lib/'.$class.'.php');
+}
+mkdir($closed.'/site/open', 0777, true);
+mkdir($closed.'/site/shut', 0777, true);
+file_put_contents($closed.'/site/open/has-change_a.php', $edited);
+file_put_contents($closed.'/site/open/a.php', $edited);
+file_put_contents($closed.'/site/shut/has-change_b.php', $edited);
+file_put_contents($closed.'/site/open/has-change_c.php', $edited);
+file_put_contents($closed.'/site/open/c.php', $edited);
+chmod($closed.'/site/open/c.php', 0000);
+chmod($closed.'/site/open/has-change_c.php', 0000);
+chmod($closed.'/site/shut', 0000);
+exec('chmod -R a+rX '.escapeshellarg($closed.'/lib').' && chmod a+rx '.escapeshellarg($closed).' '.escapeshellarg($closed.'/site').' '.escapeshellarg($closed.'/site/open'));
+file_put_contents($closed.'/probe.php', <<<'PHP'
+<?php
+set_error_handler(static function(int $level, string $message): bool { echo 'WARNING ', $message, PHP_EOL; return true; });
+foreach(['status', 'utils', 'changefile', 'scanner'] as $class) { require __DIR__.'/lib/'.$class.'.php'; }
+$found = \Shef\Haschangefiles\Main\Scanner::find(__DIR__.'/site');
+echo 'FOUND ', count($found), PHP_EOL;
+echo 'STATUS ', (new \Shef\Haschangefiles\Main\ChangeFile(__DIR__.'/site/open/has-change_c.php'))->getStatus()->value, PHP_EOL;
+PHP);
+chmod($closed.'/probe.php', 0644);
+
+$isRoot = function_exists('posix_geteuid') && posix_geteuid() === 0;
+$prefix = '';
+if($isRoot)
+{
+	$setpriv = trim((string)shell_exec('command -v setpriv'));
+	$prefix = $setpriv === '' ? '' : escapeshellarg($setpriv).' --reuid=65534 --regid=65534 --clear-groups ';
+}
+
+if($isRoot && $prefix === '')
+{
+	Check::same('под root нужен setpriv, чтобы проверить нечитаемый каталог', false, true);
 }
 else
 {
-	echo '  SKIP нечитаемый каталог: тест запущен под root, права не действуют — проверяется в CI', PHP_EOL;
+	exec($prefix.escapeshellarg(PHP_BINARY).' '.escapeshellarg($closed.'/probe.php').' 2>&1', $probe, $probeCode);
+	Check::same(
+		'нечитаемый каталог пропускается, нечитаемый файл — «разошёлся», и всё без warning',
+		[$probeCode, $probe],
+		[0, ['FOUND 2', 'STATUS DRIFT']]
+	);
 }
+
+chmod($closed.'/site/shut', 0777);
+exec('rm -rf '.escapeshellarg($closed));
 
 // region Уборка ////
 exec('rm -rf '.escapeshellarg($site));

@@ -67,6 +67,53 @@ class Utils
 	}
 
 	/**
+	 * Маркеры правки в файле — чтением кусками, а не целиком: файл ядра в
+	 * сотни мегабайт иначе ронял отчёт по памяти. Результат тот же, что у
+	 * countChangeMarkers() на всём содержимом.
+	 *
+	 * @return int|null null — файл не прочитать
+	 */
+	public static function countChangeMarkersInFile(string $path, int $chunkSize = 1048576): ?int
+	{
+		if(!is_file($path) || !is_readable($path))
+		{
+			return null;
+		}
+
+		$handle = fopen($path, 'rb');
+		if(false === $handle)
+		{
+			return null;
+		}
+
+		// Хвост прошлого куска — на длину маркера без одного символа: маркер
+		// на стыке засчитывается, а целиком в хвосте не поместится и дважды
+		// не посчитается.
+		$tails = array_fill_keys(static::changeMarkers(), '');
+		$count = 0;
+
+		while(!feof($handle))
+		{
+			$chunk = fread($handle, max(1, $chunkSize));
+			if(false === $chunk || '' === $chunk)
+			{
+				break;
+			}
+
+			foreach($tails as $marker => $tail)
+			{
+				$buffer = $tail.$chunk;
+				$count += substr_count($buffer, $marker);
+				$tails[$marker] = substr($buffer, -(strlen($marker) - 1));
+			}
+		}
+
+		fclose($handle);
+
+		return $count;
+	}
+
+	/**
 	 * Файлы совпадают содержимым.
 	 *
 	 * До 2.0.0 сравнивался только размер: обновление, заменившее в файле
@@ -75,7 +122,8 @@ class Utils
 	 */
 	public static function isSameContent(string $left, string $right): bool
 	{
-		if(!is_file($left) || !is_file($right))
+		// Нечитаемый файл — не «совпадает», и без warning от hash_file().
+		if(!is_file($left) || !is_file($right) || !is_readable($left) || !is_readable($right))
 		{
 			return false;
 		}

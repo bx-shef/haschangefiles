@@ -47,11 +47,18 @@ class CMain
 {
 	public array $grids = [];
 	public string $title = '';
+	public bool $authFormShown = false;
 
-	/** В ядре AuthForm() заканчивается die(): здесь — исключением. */
-	public function AuthForm(mixed $message): never
+	/** Как ведёт себя AuthForm(): в ядре — die(), здесь — исключением либо возвратом. */
+	public static bool $authFormDies = true;
+
+	public function AuthForm(mixed $message): void
 	{
-		throw new AuthFormShown((string)$message);
+		$this->authFormShown = true;
+		if(static::$authFormDies)
+		{
+			throw new AuthFormShown((string)$message);
+		}
 	}
 
 	public function SetTitle(mixed $title): void
@@ -122,6 +129,12 @@ $page = $open(new CUser(false));
 Check::same('не администратору — форма входа', $page['denied'], true);
 Check::same('…грида нет', $page['app']->grids, []);
 Check::same('…вывода отчёта нет', $page['html'], '');
+
+// Страница не полагается на die() внутри AuthForm(): вернулся — дальше не идёт.
+CMain::$authFormDies = false;
+$page = $open(new CUser(false));
+Check::same('AuthForm() вернулся — форма показана, грида нет, вывода нет', [$page['app']->authFormShown, $page['app']->grids, $page['html']], [true, [], '']);
+CMain::$authFormDies = true;
 
 Check::group('администратору');
 

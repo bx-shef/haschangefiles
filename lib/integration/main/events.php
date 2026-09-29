@@ -22,6 +22,17 @@ class Events
 	public const DANGER_COLOR = '#f1416c';
 
 	/**
+	 * Обработчик уже отработал в этом запросе.
+	 *
+	 * Установщик снимает регистрации 1.x (на класс
+	 * Integration\Shef\UiClear\Events) и при установке, но снимает по строке, а
+	 * строки регистраций 1.x сверить не с чем: исходников 1.x в истории нет.
+	 * Не совпадёт строка — на портале две регистрации, и без этого флага
+	 * кнопка и подтверждение появились бы дважды.
+	 */
+	private static bool $isShown = false;
+
+	/**
 	 * Страница обновлений: кнопка «Правки ядра» и подтверждение перед
 	 * установкой обновлений — обновление перезапишет исправленные файлы.
 	 *
@@ -30,7 +41,7 @@ class Events
 	 */
 	public static function onAdminContextMenuShow(?array &$items = []): void
 	{
-		if(!static::isUpdatePage())
+		if(static::$isShown || !static::isUpdatePage())
 		{
 			return;
 		}
@@ -39,6 +50,8 @@ class Events
 		{
 			return;
 		}
+
+		static::$isShown = true;
 
 		$lang = (string)(Context::getCurrent()?->getLanguage() ?: 'ru');
 
@@ -144,5 +157,15 @@ JS, [
 			'#TITLE#' => $json((string)Loc::getMessage('SH_HASCHANGEFILES_UPDATE_CONFIRM_TITLE')),
 			'#BUTTON#' => $json((string)Loc::getMessage('SH_HASCHANGEFILES_UPDATE_CONFIRM_BTN')),
 		]);
+	}
+
+	/**
+	 * Следующий вызов обработчика снова отработает.
+	 *
+	 * @internal для тестов: в одном процессе тест открывает «страницу» не раз
+	 */
+	public static function reset(): void
+	{
+		static::$isShown = false;
 	}
 }
