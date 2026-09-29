@@ -70,14 +70,22 @@ class ChangeFile
 		return $this->markers;
 	}
 
+	/**
+	 * Маркеры считаются только у совпавших файлов: разошедшийся — DRIFT и
+	 * без них, а читать его целиком незачем. Файл в сотни мегабайт иначе
+	 * ронял страницу отчёта и консоль по памяти.
+	 */
 	public function getStatus(): Status
 	{
 		if(null === $this->status)
 		{
+			$isExists = $this->isOriginalExists();
+			$isSame = $isExists && Utils::isSameContent($this->originalPath, $this->mirrorPath);
+
 			$this->status = Utils::getStatus(
-				$this->isOriginalExists(),
-				Utils::isSameContent($this->originalPath, $this->mirrorPath),
-				$this->getMarkers()
+				$isExists,
+				$isSame,
+				$isSame ? $this->getMarkers() : 0
 			);
 		}
 

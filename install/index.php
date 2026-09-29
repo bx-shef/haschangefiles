@@ -300,6 +300,20 @@ Class shef_haschangefiles
 	public function InstallEvents(): bool
 	{
 		$eventManager = EventManager::getInstance();
+		
+		// Регистрации 1.x — долой и при установке: портал, обновлённый с 1.x,
+		// после InstallEvents() без удаления модуля иначе держал бы обе, и
+		// кнопка на странице обновлений задвоилась бы.
+		foreach($this->getLegacyEventsList() as $event)
+		{
+			$eventManager->unRegisterEventHandler(
+				$event['from']['module'],
+				$event['from']['event'],
+				$event['to']['module'],
+				$event['to']['class'],
+				$event['to']['function'],
+			);
+		}
 
 		foreach($this->getEventsList() as $event)
 		{

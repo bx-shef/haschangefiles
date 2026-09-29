@@ -35,6 +35,8 @@ global $APPLICATION, $USER;
 if(!($USER instanceof \CUser) || !$USER->IsAdmin())
 {
 	$APPLICATION->AuthForm(Loc::getMessage('SH_HASCHANGEFILES_LIST_ACCESS_DENIED'));
+	// AuthForm() в ядре заканчивается die(); return — на случай, если нет.
+	return;
 }
 
 if(!Loader::includeModule('shef.haschangefiles'))

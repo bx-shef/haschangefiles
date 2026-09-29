@@ -13,9 +13,12 @@
  *   обновление, заменившее символ на символ: до 2.0.0 сравнивался размер, и
  *   такой файл выглядел «правкой на месте»;
  * * путь оригинала: префикс снимается с имени файла, а не по всему пути;
- * * обход: пропуск по имени и по пути, символическая ссылка на каталог не
- *   обходится (ссылка наверх давала бесконечную рекурсию), нечитаемый
- *   каталог пропускается, а не роняет страницу.
+ * * обход: разделы и пропуски — одни на страницу и консоль
+ *   (Scanner::getScope()); каталог с именем cache или tmp глубоко в ядре
+ *   обходится — до 2.0.0 такие имена пропускались на любой глубине и
+ *   прятали правки; символическая ссылка на каталог не обходится (ссылка
+ *   наверх давала бесконечную рекурсию); нечитаемый каталог пропускается,
+ *   а не роняет страницу.
  */
 
 $root = dirname(__DIR__);
@@ -64,8 +67,12 @@ $put('/bitrix/js/ui/has-change_gone.js', "// change ////\n");
 // Каталог с тем же сочетанием букв в имени.
 $put('/bitrix/components/has-change_dir/tpl.php', $edited);
 $put('/bitrix/components/has-change_dir/has-change_tpl.php', $edited);
+// Каталог «cache» глубоко в модуле — это код ядра, правки там бывают.
+$put('/bitrix/modules/main/lib/cache/engine.php', $edited);
+$put('/bitrix/modules/main/lib/cache/has-change_engine.php', $edited);
 // Там, где не ищем.
 $put('/bitrix/cache/has-change_cached.php', $edited);
+$put('/local/php_interface/has-change_init.php', $edited);
 $put('/upload/has-change_upload.php', $edited);
 $put('/bitrix/backup/has-change_backup.php', $edited);
 // Публичная часть.
@@ -109,28 +116,34 @@ Check::same('префикс не в начале — не зеркало', Utils
 
 Check::group('обход');
 
-$found = array_map(
+$relative = static fn(array $paths): array => array_map(
 	static fn(string $path): string => substr($path, strlen($site)),
-	Scanner::find($site)
+	$paths
 );
 
-Check::same('найдено ровно то, что надо', $found, [
+$scope = Scanner::getScope($site.'/');
+Check::same('разделы — публичная часть и ядро', array_keys($scope), ['PUBLIC', 'CORE']);
+
+$found = [];
+foreach($scope as $section)
+{
+	$found = array_merge($found, $relative(Scanner::find($section['dir'], $section['skip'])));
+}
+
+Check::same('по разделам найдено ровно то, что надо', $found, [
+	'/crm/has-change_index.php',
 	'/bitrix/components/has-change_dir/has-change_tpl.php',
 	'/bitrix/js/ui/has-change_gone.js',
 	'/bitrix/modules/crm/lib/has-change_drift.php',
 	'/bitrix/modules/crm/lib/has-change_ok.php',
 	'/bitrix/modules/crm/lib/has-change_same-size.php',
+	'/bitrix/modules/main/lib/cache/has-change_engine.php',
 	'/bitrix/templates/main/has-change_nomark.php',
-	'/crm/has-change_index.php',
 ]);
 
-$found = Scanner::find($site, [$site.'/bitrix']);
-Check::same('пропуск по пути', array_map(static fn(string $path): string => substr($path, strlen($site)), $found), ['/crm/has-change_index.php']);
-
-$found = Scanner::find($site.'/bitrix/', [$site.'/bitrix/modules/'], []);
 Check::same(
-	'без пропуска по имени кеш и резервные копии видны, пути со слэшем на конце — те же',
-	array_map(static fn(string $path): string => substr($path, strlen($site)), $found),
+	'пропуск по пути — только на своём уровне',
+	$relative(Scanner::find($site.'/bitrix/', [$site.'/bitrix/modules/'], [])),
 	[
 		'/bitrix/backup/has-change_backup.php',
 		'/bitrix/cache/has-change_cached.php',
@@ -140,22 +153,30 @@ Check::same(
 	]
 );
 
+$put('/.git/objects/has-change_x.php', $edited);
+Check::same('.git — не обходится нигде', in_array('/.git/objects/has-change_x.php', $relative(Scanner::find($site)), true), false);
+
 Check::same('каталога нет — пусто, а не ошибка', Scanner::find($site.'/нет'), []);
 
 // Ссылка наверх: обход по ней не закончился бы никогда.
+$before = count(Scanner::find($site));
 symlink($site, $site.'/bitrix/modules/loop');
 symlink($site.'/crm', $site.'/crm-link');
-$found = Scanner::find($site);
-Check::same('по символическим ссылкам на каталоги не ходим', count($found), 7);
+Check::same('по символическим ссылкам на каталоги не ходим', count(Scanner::find($site)), $before);
 
-// Нечитаемый каталог. Под root права не действуют — там проверять нечего.
+// Нечитаемый каталог. Под root права не действуют — проверить нечем, и это
+// печатается, а не проходит молча.
 if(function_exists('posix_geteuid') && posix_geteuid() !== 0)
 {
 	mkdir($site.'/closed');
 	$put('/closed/has-change_x.php', $edited);
 	chmod($site.'/closed', 0000);
-	Check::same('нечитаемый каталог пропускается', count(Scanner::find($site)), 7);
+	Check::same('нечитаемый каталог пропускается', count(Scanner::find($site)), $before);
 	chmod($site.'/closed', 0777);
+}
+else
+{
+	echo '  SKIP нечитаемый каталог: тест запущен под root, права не действуют — проверяется в CI', PHP_EOL;
 }
 
 // region Уборка ////

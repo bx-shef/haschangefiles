@@ -41,7 +41,7 @@ Composer разворачивает в целевой каталог **коре�
 | `build.sh` | KEEP | сборка и проверки |
 | `tests/` | KEEP | тесты и заглушки ядра |
 | `examples/` | KEEP | запускаемые примеры |
-| `.claude/skills/` | KEEP | навыки агента — **копия** из `bx-shef/options`, раскладывает `sync.sh` |
+| `.claude/skills/` | KEEP | навыки агента: навыки линейки — **копия** из `bx-shef/options` (`MANIFEST`, раскладывает `sync.sh --to`); `shef-core-change` и `shef-restore-core-changes` — **локальные**, правятся здесь (`LOCAL.MANIFEST`, `sync.sh --local`) |
 | `.github/` | KEEP | CI и релиз |
 | `CONTRIBUTING.md`, `CLAUDE.md` | KEEP | процесс и памятка агенту |
 | `.gitattributes`, `.gitignore` | KEEP | |
@@ -53,8 +53,8 @@ Composer разворачивает в целевой каталог **коре�
 | `\Shef\Haschangefiles\Main\Utils` | маркеры правки, путь оригинала по зеркалу, сравнение файлов, состояние | не нужно |
 | `\Shef\Haschangefiles\Main\Status` | enum состояния: `OK`, `DRIFT`, `NO-MARKERS`, `NO-ORIGINAL` | не нужно |
 | `\Shef\Haschangefiles\Main\ChangeFile` | одна правка: зеркало и оригинал, размеры, даты, состояние | не нужно |
-| `\Shef\Haschangefiles\Main\Scanner` | поиск зеркал под каталогом | не нужно |
-| `\Shef\Haschangefiles\Main\Report` | разделы, колонки и строки отчёта | `Loc` |
+| `\Shef\Haschangefiles\Main\Scanner` | поиск зеркал под каталогом; границы обхода для страницы и консоли (`getScope()`) | не нужно |
+| `\Shef\Haschangefiles\Main\Report` | названия разделов, колонки и строки отчёта | `Loc` |
 | `\Shef\Haschangefiles\Main\AdminPage` | заглушка страницы отчёта в `/bitrix/admin` | не нужно |
 | `\Shef\Haschangefiles\Main\Constants` | id модуля, настройки PhpStorm | да |
 | `\Shef\Haschangefiles\Integration\Main\AdminMenu` | раздел в меню административной части | `Loc` |

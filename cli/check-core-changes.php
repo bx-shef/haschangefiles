@@ -4,8 +4,9 @@
  * Проверка правок ядра из консоли: то же, что страница «Правки ядра», но
  * кодом возврата — для CI и для шага после обновления Битрикса.
  *
- * Обходит сайт, для каждого зеркала has-change_<файл> сравнивает его с
- * оригиналом рядом и печатает состояние:
+ * Обходит те же разделы, что и страница (Scanner::getScope()), для каждого
+ * зеркала has-change_<файл> сравнивает его с оригиналом рядом и печатает
+ * состояние. Первое слово строки — контракт, его разбирают скрипты:
  *
  *   OK           правка на месте
  *   DRIFT        оригинал разошёлся с зеркалом — правку вернуть
@@ -14,17 +15,19 @@
  *
  * Запуск (из каталога модуля или откуда угодно):
  *
- *   php cli/check-core-changes.php                  # весь сайт
- *   BASE_DIR=/bitrix php cli/check-core-changes.php # только ядро
+ *   php cli/check-core-changes.php                  # публичная часть и ядро
+ *   BASE_DIR=/bitrix php cli/check-core-changes.php # один каталог от корня
  *   php cli/check-core-changes.php --diff           # плюс diff -u по DRIFT
  *
  * Корень сайта — из DOCUMENT_ROOT, а без него — на четыре уровня выше этого
- * файла: <корень>/bitrix/modules/shef.haschangefiles/cli или
- * <корень>/local/modules/shef.haschangefiles/cli.
+ * файла, по пути, которым его запустили (модуль-ссылка не уводит наверх
+ * от своего настоящего места): <корень>/bitrix/modules/shef.haschangefiles/cli
+ * или <корень>/local/modules/shef.haschangefiles/cli.
  *
- * Код возврата: 0 — всё на месте; 1 — есть что восстановить; 2 — не нашёлся
- * корень сайта. Скрипт ничего не меняет. Ядро Битрикса и базу не поднимает —
- * сравнивает только файлы, поэтому работает и на копии сайта без портала.
+ * Код возврата: 0 — всё на месте; 1 — есть что восстановить; 2 — не найден
+ * корень сайта (нет в нём /bitrix) или каталог BASE_DIR внутри него. Скрипт
+ * ничего не меняет. Ядро Битрикса и базу не поднимает — сравнивает только
+ * файлы, поэтому работает и на копии сайта без портала.
  */
 
 if(PHP_SAPI !== 'cli')
@@ -43,34 +46,69 @@ use Shef\Haschangefiles\Main\ChangeFile;
 use Shef\Haschangefiles\Main\Scanner;
 use Shef\Haschangefiles\Main\Status;
 
-$documentRoot = trim((string)getenv('DOCUMENT_ROOT'));
-$root = realpath($documentRoot !== '' ? $documentRoot : dirname(__DIR__, 4));
-if($root === false || !is_dir($root))
+/** Имя файла с диска — в терминал без управляющих символов. */
+$printable = static fn(string $value): string => (string)preg_replace('/[\x00-\x1f\x7f]/', '?', $value);
+
+$fail = static function(string $message): never
 {
-	fwrite(STDERR, 'Не найден корень сайта: задайте DOCUMENT_ROOT'.PHP_EOL);
+	fwrite(STDERR, $message.PHP_EOL);
 	exit(2);
+};
+
+// Без DOCUMENT_ROOT — от пути, которым скрипт запустили: __DIR__ уже
+// разрешён, и у модуля-ссылки вёл бы в чужой каталог рядом с настоящим.
+$script = (string)($_SERVER['SCRIPT_FILENAME'] ?? __FILE__);
+if(!str_starts_with($script, '/'))
+{
+	$script = getcwd().'/'.$script;
+}
+
+$documentRoot = trim((string)getenv('DOCUMENT_ROOT'));
+$root = realpath($documentRoot !== '' ? $documentRoot : dirname($script, 5));
+
+// Каталог без /bitrix — не сайт: «зеркал 0, код 0» на опечатке в пути
+// выглядело бы пройденной проверкой.
+if($root === false || !is_dir($root.'/bitrix'))
+{
+	$fail('Не найден корень сайта (каталог с /bitrix): задайте DOCUMENT_ROOT');
 }
 
 $showDiff = in_array('--diff', $argv, true);
+if($showDiff && !function_exists('shell_exec'))
+{
+	fwrite(STDERR, 'shell_exec отключён — --diff не печатается'.PHP_EOL);
+	$showDiff = false;
+}
+
+$scope = Scanner::getScope($root);
 
 $baseRel = trim((string)getenv('BASE_DIR'));
-$baseDir = $baseRel !== '' ? $root.'/'.trim($baseRel, '/') : $root;
-if(!is_dir($baseDir))
+if($baseRel !== '' && trim($baseRel, '/') !== '')
 {
-	fwrite(STDERR, 'Нет каталога BASE_DIR: '.$baseDir.PHP_EOL);
-	exit(2);
+	$baseDir = realpath($root.'/'.trim($baseRel, '/'));
+	if($baseDir === false || !is_dir($baseDir) || ($baseDir !== $root && !str_starts_with($baseDir, $root.'/')))
+	{
+		$fail('Нет каталога BASE_DIR внутри корня сайта: '.$printable($baseRel));
+	}
+
+	// Один каталог, пропуски — те же, что у разделов.
+	$scope = [[
+		'dir' => $baseDir,
+		'skip' => array_merge(...array_values(array_column($scope, 'skip'))),
+	]];
 }
 
 $found = 0;
 $toFix = 0;
 
-foreach(Scanner::find($baseDir) as $mirror)
+foreach($scope as $section)
+foreach(Scanner::find($section['dir'], $section['skip']) as $mirror)
 {
 	$found++;
 	$file = new ChangeFile($mirror);
 	$status = $file->getStatus();
 
-	printf('%-12s %s%s', $status->value, substr($file->getOriginalPath(), strlen($root)), PHP_EOL);
+	printf('%-12s %s%s', $status->value, $printable(substr($file->getOriginalPath(), strlen($root))), PHP_EOL);
 
 	if(!$status->isNeedFix())
 	{

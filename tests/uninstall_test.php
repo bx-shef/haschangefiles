@@ -9,8 +9,9 @@
  *   идентификаторе унесла бы настройки соседа.
  * * savedata = Y оставляет настройки — уговор ядра.
  * * Обе регистрации 1.x снимаются — на событие shef.uiclear и
- *   OnAdminContextMenuShow на прежний класс: замена файлов их не снимает, а
- *   в installEvents их больше нет.
+ *   OnAdminContextMenuShow на прежний класс — и при удалении, и при
+ *   установке: замена файлов их не снимает, а встреться старая и новая —
+ *   кнопка на странице обновлений задвоилась бы.
  * * Каталоги 1.x в /local (страница без проверки прав и компонент) и
  *   скриншоты в /bitrix/images убираются и при установке, и при удалении.
  * * Страница отчёта в /bitrix/admin пишется из того каталога, где модуль
@@ -145,6 +146,14 @@ Check::same(
 	'ставится один — на класс 2.x',
 	array_map($describe, EventManager::$registered),
 	['main:OnAdminContextMenuShow -> Shef\\Haschangefiles\\Integration\\Main\\Events::onAdminContextMenuShow']
+);
+Check::same(
+	'обе регистрации 1.x сняты и при установке — старая и новая не встретятся',
+	array_map($describe, EventManager::$unregistered),
+	[
+		'shef.uiclear:onBitrixMenuExtInitTopPanelUserMenu -> Shef\\Haschangefiles\\Integration\\Shef\\UiClear\\Events::onBitrixMenuExtInitTopPanelUserMenu',
+		'main:OnAdminContextMenuShow -> Shef\\Haschangefiles\\Integration\\Shef\\UiClear\\Events::onAdminContextMenuShow',
+	]
 );
 
 $module = $given();

@@ -18,54 +18,25 @@ Loc::loadMessages(__FILE__);
 class Report
 {
 	/**
-	 * Разделы отчёта: публичная часть и ядро.
-	 *
-	 * В публичной части не обходятся /bitrix (у него свой раздел), /upload
-	 * (данные) и /local (код проекта, а не ядра — править его можно без
-	 * зеркал). В ядре — каталоги, где правок не бывает, а файлов много.
+	 * Разделы отчёта: что обходить — Scanner::getScope(), здесь только
+	 * названия.
 	 *
 	 * @return list<array{code: string, title: string, dir: string, skip: string[]}>
 	 */
 	public static function getSections(string $documentRoot): array
 	{
-		$documentRoot = rtrim(str_replace('\\', '/', $documentRoot), '/');
-		$bitrix = $documentRoot.'/bitrix';
+		$sections = [];
+		foreach(Scanner::getScope($documentRoot) as $code => $scope)
+		{
+			$sections[] = [
+				'code' => $code,
+				'title' => (string)Loc::getMessage('SH_HASCHANGEFILES_SECTION_'.$code),
+				'dir' => $scope['dir'],
+				'skip' => $scope['skip'],
+			];
+		}
 
-		return [
-			[
-				'code' => 'PUBLIC',
-				'title' => (string)Loc::getMessage('SH_HASCHANGEFILES_SECTION_PUBLIC'),
-				'dir' => $documentRoot,
-				'skip' => array_map(
-					static fn(string $dir): string => $documentRoot.$dir,
-					['/bitrix', '/upload', '/local', '/images']
-				),
-			],
-			[
-				'code' => 'CORE',
-				'title' => (string)Loc::getMessage('SH_HASCHANGEFILES_SECTION_CORE'),
-				'dir' => $bitrix,
-				'skip' => array_map(
-					static fn(string $dir): string => $bitrix.$dir,
-					[
-						'/backup',
-						'/blocks',
-						'/cache',
-						'/catalog_export',
-						'/fonts',
-						'/image_uploader',
-						'/managed_cache',
-						'/mobileapp',
-						'/otp',
-						'/panel',
-						'/sounds',
-						'/stack_cache',
-						'/tmp',
-						'/updates',
-					]
-				),
-			],
-		];
+		return $sections;
 	}
 
 	/**

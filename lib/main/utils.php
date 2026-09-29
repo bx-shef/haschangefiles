@@ -85,7 +85,10 @@ class Utils
 			return false;
 		}
 
-		return hash_file('sha256', $left) === hash_file('sha256', $right);
+		// Не прочитался файл — false; два false не «совпадают».
+		$leftHash = hash_file('sha256', $left);
+
+		return false !== $leftHash && $leftHash === hash_file('sha256', $right);
 	}
 
 	/**

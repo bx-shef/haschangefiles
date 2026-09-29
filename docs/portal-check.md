@@ -39,10 +39,10 @@ mysqldump -u… portal b_module_to_module --where="TO_MODULE_ID='shef.haschangef
 
 ```bash
 cd /var/www/portal
-printf '<?php\n// change ////\n$a = 2;\n// change stop ////\n' > bitrix/php_interface/sh_test.php
-cp bitrix/php_interface/sh_test.php bitrix/php_interface/has-change_sh_test.php
-printf '<?php\n$a = 1;\n' > bitrix/php_interface/sh_drift.php
-printf '<?php\n// change ////\n$a = 2;\n' > bitrix/php_interface/has-change_sh_drift.php
+printf '<?php\n// change ////\n$a = 2;\n// change stop ////\n' > bitrix/modules/main/sh_test.php
+cp bitrix/modules/main/sh_test.php bitrix/modules/main/has-change_sh_test.php
+printf '<?php\n$a = 1;\n' > bitrix/modules/main/sh_drift.php
+printf '<?php\n// change ////\n$a = 2;\n' > bitrix/modules/main/has-change_sh_drift.php
 ```
 
 ## 0. Архив — тот самый
@@ -52,7 +52,7 @@ printf '<?php\n// change ////\n$a = 2;\n' > bitrix/php_interface/has-change_sh_d
 ```bash
 git clone https://github.com/bx-shef/haschangefiles.git
 cd haschangefiles && git checkout <тег проверяемой версии>
-./build.sh                       # последняя строка напечатает sha256
+./build.sh                       # sha256 — в строке «архив shef.haschangefiles.zip: …»
 sha256sum /путь/к/скачанному/shef.haschangefiles.zip
 ```
 
@@ -79,6 +79,19 @@ sha256sum /путь/к/скачанному/shef.haschangefiles.zip
 
 Делается на стенде, где стоит 1.x (1.0.x или 1.1.0).
 
+0. До обновления — посмотреть, что установщик потом удалит целиком, и нет
+   ли там своего у проекта; и кто подключает компонент 1.x:
+
+```bash
+cd /var/www/portal
+ls -R local/components/shef.haschangefiles local/admin/shef.haschangefiles bitrix/images/shef.haschangefiles 2>/dev/null
+grep -rl "shef.haschangefiles:list" --include=*.php . 2>/dev/null | grep -v '^./local/admin/shef.haschangefiles/'
+php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php > /tmp/core-changes.before.txt 2>/dev/null   # только на 1.1.0
+```
+
+   Своё в этих каталогах или чужие страницы с компонентом — решение
+   владельца до обновления, не после.
+
 1. Заменить каталог модуля содержимым новой версии **целиком** (старый убрать,
    новый распаковать).
 2. Открыть `/bitrix/admin/settings.php?mid=shef.haschangefiles`.
@@ -90,7 +103,12 @@ sha256sum /путь/к/скачанному/shef.haschangefiles.zip
   parameter»;
 * имя проекта и корень PhpStorm — прежние;
 * в меню **Настройки → Правки ядра** есть, а `/bitrix/admin/shef_haschangefiles_list.php`
-  появился сам, при первом построении меню администратором;
+  появился сам, при первом построении меню администратором. Не появился —
+  проверить, может ли веб-сервер писать в `/bitrix/admin`;
+* в отчёте часть правок, бывших в 1.x «на месте», может впервые стать
+  «Восстановить»: 2.0.0 сравнивает содержимое, а не размер. Это ожидаемо —
+  зеркало от другой версии файла; разобрать по навыку
+  `shef-restore-core-changes`, а не считать поломкой;
 * на странице обновлений кнопка «Правки ядра» и подтверждение работают —
   через прежнюю регистрацию обработчика (класс 1.x оставлен заглушкой) и
   **ровно по одному разу**;
@@ -109,8 +127,9 @@ require "bitrix/modules/shef.haschangefiles/install/index.php";
 var_dump((new shef_haschangefiles())->InstallFiles());'
 ```
 
-**Ожидается:** `bool(true)`; `/local/admin/shef.haschangefiles` и
-`/local/components/shef.haschangefiles` убраны — страница 1.x больше не
+**Ожидается:** `bool(true)`; `/local/admin/shef.haschangefiles`,
+`/local/components/shef.haschangefiles` и `/bitrix/images/shef.haschangefiles`
+убраны — страница 1.x больше не
 открывается (404), и отчёт без проверки прав с ней ушёл.
 
 ## C. Отчёт
@@ -121,7 +140,7 @@ var_dump((new shef_haschangefiles())->InstallFiles());'
 
 * два раздела — «Публичная часть» и «Ядро Битрикса», у каждого свой грид;
 * `sh_test.php` — «На месте», `sh_drift.php` — «Восстановить» красным;
-* путь `/bitrix/php_interface`, дата и размер обоих файлов;
+* путь `/bitrix/modules/main`, дата и размер обоих файлов;
 * под пользователем **без** прав администратора
   `/bitrix/admin/shef_haschangefiles_list.php` показывает форму входа, пункта
   в меню нет.
@@ -154,11 +173,28 @@ var_dump((new shef_haschangefiles())->InstallFiles());'
 ```bash
 cd /var/www/portal
 php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php; echo "код $?"
-BASE_DIR=/bitrix/php_interface php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php --diff
+BASE_DIR=/bitrix/modules/main php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php --diff
 ```
 
 **Ожидается:** `OK` у `sh_test.php`, `DRIFT` у `sh_drift.php`, код `1`; с
-`--diff` — разница файлов. `curl https://<портал>/bitrix/modules/shef.haschangefiles/cli/check-core-changes.php`
+`--diff` — разница файлов. Страница отчёта и консоль видят одно и то же:
+число строк в отчёте равно числу строк состояния в выводе консоли.
+`DOCUMENT_ROOT=/tmp php …/check-core-changes.php; echo $?` — код `2`, а не `0`.
+
+Зеркала не отдаются веб-сервером (правило из [security.md](security.md)):
+
+```bash
+cp bitrix/modules/main/sh_test.php bitrix/tools/has-change_sh_probe.php
+curl -s -o /dev/null -w '%{http_code}\n' https://<портал>/bitrix/tools/has-change_sh_probe.php   # 403
+rm bitrix/tools/has-change_sh_probe.php
+```
+
+Каталоги с «тяжёлыми» именами глубоко в ядре теперь обходятся — стоит
+знать, сколько их и не выросло ли время отчёта:
+
+```bash
+find bitrix -mindepth 3 -type d \( -name cache -o -name tmp -o -name backup -o -name upload -o -name updates \) | wc -l
+``` `curl https://<портал>/bitrix/modules/shef.haschangefiles/cli/check-core-changes.php`
 — 403 от веб-сервера.
 
 ## G. Удаление
@@ -169,7 +205,10 @@ BASE_DIR=/bitrix/php_interface php bitrix/modules/shef.haschangefiles/cli/check-
 
 * настроек модуля в `b_option` нет, настройки `shef.options` — на месте;
 * в `b_module_to_module` не осталось обработчиков с
-  `TO_MODULE_ID='shef.haschangefiles'` — в том числе двух из 1.x;
+  `TO_MODULE_ID='shef.haschangefiles'` — в том числе двух из 1.x. Остались
+  строки 1.x — значит, их запись на портале не совпала с
+  `getLegacyEventsList()` строкой (ведущий `\`, регистр): прислать строки из
+  `/tmp/events.before.sql`;
 * `/bitrix/admin/shef_haschangefiles_list.php` удалён, остальные файлы
   `/bitrix/admin/` на месте. Если перед удалением положить на место заглушки
   свой файл — он остаётся;
@@ -192,7 +231,7 @@ for e in check report; do DOCUMENT_ROOT=/var/www/portal php examples/$e.php || e
 ## После проверки
 
 ```bash
-rm /var/www/portal/bitrix/php_interface/{sh_test,has-change_sh_test,sh_drift,has-change_sh_drift}.php
+rm /var/www/portal/bitrix/modules/main/{sh_test,has-change_sh_test,sh_drift,has-change_sh_drift}.php
 ```
 
 ## Бланк результата
@@ -210,6 +249,7 @@ C. Отчёт .................................. ок / не ок
 D. PhpStorm ............................... ок / не ок / нет Toolbox
 E. Страница обновлений .................... ок / не ок
 F. Консоль ................................ ок / не ок
+   зеркала по URL — 403 ................... ок / не ок
 G. Удаление ............................... ок / не ок
 H. CP1251 ................................. ок / пропущено
 I. Примеры на живом ядре .................. ок / не ок

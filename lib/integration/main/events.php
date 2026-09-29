@@ -22,17 +22,6 @@ class Events
 	public const DANGER_COLOR = '#f1416c';
 
 	/**
-	 * Обработчик уже отработал в этом запросе.
-	 *
-	 * На портале, обновлённом с 1.x, событие зарегистрировано на прежний
-	 * класс (Integration\Shef\UiClear\Events), а после переустановки — на
-	 * этот. Если на портале окажутся обе регистрации (скажем, InstallEvents()
-	 * позвали руками без удаления модуля), кнопка и подтверждение не должны
-	 * появиться дважды.
-	 */
-	private static bool $isShown = false;
-
-	/**
 	 * Страница обновлений: кнопка «Правки ядра» и подтверждение перед
 	 * установкой обновлений — обновление перезапишет исправленные файлы.
 	 *
@@ -41,7 +30,7 @@ class Events
 	 */
 	public static function onAdminContextMenuShow(?array &$items = []): void
 	{
-		if(static::$isShown || !static::isUpdatePage())
+		if(!static::isUpdatePage())
 		{
 			return;
 		}
@@ -50,8 +39,6 @@ class Events
 		{
 			return;
 		}
-
-		static::$isShown = true;
 
 		$lang = (string)(Context::getCurrent()?->getLanguage() ?: 'ru');
 
@@ -72,6 +59,8 @@ class Events
 
 	/**
 	 * Кнопка в контекстном меню страницы обновлений: отчёт в новой вкладке.
+	 *
+	 * @internal открыт для теста, не API модуля
 	 */
 	public static function getContextMenuItem(string $lang): array
 	{
@@ -94,6 +83,8 @@ class Events
 	 *
 	 * Тексты уходят в скрипт через json_encode: подстановка строкой в
 	 * кавычки ломалась бы на первой же кавычке в переводе.
+	 *
+	 * @internal открыт для теста, не API модуля
 	 */
 	public static function getConfirmScript(string $lang): string
 	{
@@ -153,11 +144,5 @@ JS, [
 			'#TITLE#' => $json((string)Loc::getMessage('SH_HASCHANGEFILES_UPDATE_CONFIRM_TITLE')),
 			'#BUTTON#' => $json((string)Loc::getMessage('SH_HASCHANGEFILES_UPDATE_CONFIRM_BTN')),
 		]);
-	}
-
-	/** Для тестов: следующий вызов обработчика снова отработает. */
-	public static function reset(): void
-	{
-		static::$isShown = false;
 	}
 }
