@@ -50,15 +50,17 @@ class AdminPage
 		$documentRoot = rtrim(str_replace('\\', '/', $documentRoot), '/');
 		$page = rtrim(str_replace('\\', '/', $moduleDir), '/').static::MODULE_PAGE;
 
+		// Путь — через var_export: кавычка в имени каталога иначе закрыла бы
+		// строку, и заглушка стала бы чужим кодом или синтаксической ошибкой.
 		if($documentRoot !== '' && str_starts_with($page, $documentRoot.'/'))
 		{
 			return sprintf(
-				"<?php require(\$_SERVER['DOCUMENT_ROOT'].'%s');\n",
-				substr($page, strlen($documentRoot))
+				"<?php require(\$_SERVER['DOCUMENT_ROOT'].%s);\n",
+				var_export(substr($page, strlen($documentRoot)), true)
 			);
 		}
 
-		return sprintf("<?php require('%s');\n", $page);
+		return sprintf("<?php require(%s);\n", var_export($page, true));
 	}
 
 	/**
@@ -105,7 +107,24 @@ class AdminPage
 			return false;
 		}
 
-		return false !== file_put_contents($target, $content);
+		// Через временный файл и rename: запрос, пришедший в момент записи,
+		// не получит обрезанный PHP.
+		$temp = $target.'.'.getmypid().'.tmp';
+		if(false === file_put_contents($temp, $content))
+		{
+			// Кончилось место — недописанный файл не оставлять: он лежал бы в
+			// /bitrix/admin, и никто бы его не убрал.
+			@unlink($temp);
+			return false;
+		}
+
+		if(!rename($temp, $target))
+		{
+			@unlink($temp);
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

@@ -52,6 +52,20 @@ Check::same(
 	"<?php require('".$www."-old/bitrix/modules/shef.haschangefiles/admin/list.php');\n"
 );
 
+// Кавычка в пути модуля не закрывает строку: иначе заглушка стала бы
+// синтаксической ошибкой, а то и чужим кодом.
+$quoted = AdminPage::getContent($www, "/opt/o'brien'.phpinfo().'/shef.haschangefiles");
+Check::same(
+	'кавычка в пути — внутри строки',
+	$quoted,
+	"<?php require('/opt/o\\'brien\\'.phpinfo().\\'/shef.haschangefiles/admin/list.php');\n"
+);
+$probeQuoted = $portal.'/probe-quoted.php';
+file_put_contents($probeQuoted, $quoted);
+exec(escapeshellarg(PHP_BINARY).' -l '.escapeshellarg($probeQuoted).' 2>&1', $lintQuoted, $codeQuoted);
+Check::same('…и это верный PHP', $codeQuoted, 0);
+Check::same('…и своя для модуля по этому пути', AdminPage::isOwn($quoted, $www, "/opt/o'brien'.phpinfo().'/shef.haschangefiles"), true);
+
 // Заглушка должна быть рабочим PHP, а не только похожей на него строкой.
 $probe = $portal.'/probe.php';
 file_put_contents($probe, AdminPage::getContent($www, $www.'/local/modules/shef.haschangefiles'));

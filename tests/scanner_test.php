@@ -13,9 +13,12 @@
  *   обновление, заменившее символ на символ: до 2.0.0 сравнивался размер, и
  *   такой файл выглядел «правкой на месте»;
  * * путь оригинала: префикс снимается с имени файла, а не по всему пути;
- * * обход: пропуск по имени и по пути, символическая ссылка на каталог не
- *   обходится (ссылка наверх давала бесконечную рекурсию), нечитаемый
- *   каталог пропускается, а не роняет страницу.
+ * * обход: разделы и пропуски — одни на страницу и консоль
+ *   (Scanner::getScope()); каталог с именем cache или tmp глубоко в ядре
+ *   обходится — до 2.0.0 такие имена пропускались на любой глубине и
+ *   прятали правки; символическая ссылка на каталог не обходится (ссылка
+ *   наверх давала бесконечную рекурсию); нечитаемый каталог пропускается,
+ *   а не роняет страницу.
  */
 
 $root = dirname(__DIR__);
@@ -64,8 +67,12 @@ $put('/bitrix/js/ui/has-change_gone.js', "// change ////\n");
 // Каталог с тем же сочетанием букв в имени.
 $put('/bitrix/components/has-change_dir/tpl.php', $edited);
 $put('/bitrix/components/has-change_dir/has-change_tpl.php', $edited);
+// Каталог «cache» глубоко в модуле — это код ядра, правки там бывают.
+$put('/bitrix/modules/main/lib/cache/engine.php', $edited);
+$put('/bitrix/modules/main/lib/cache/has-change_engine.php', $edited);
 // Там, где не ищем.
 $put('/bitrix/cache/has-change_cached.php', $edited);
+$put('/local/php_interface/has-change_init.php', $edited);
 $put('/upload/has-change_upload.php', $edited);
 $put('/bitrix/backup/has-change_backup.php', $edited);
 // Публичная часть.
@@ -95,6 +102,16 @@ Check::same('без маркеров', Utils::countChangeMarkers("<?php\n// пр
 // засчитывается. Так было всегда; держим, чтобы это не поменялось молча.
 Check::same('«// changed» — тоже маркер', Utils::countChangeMarkers("<?php\n// changed by vendor\n"), 1);
 
+Check::group('маркеры из файла — кусками');
+
+$markerFile = $put('/tmp-markers.txt', str_repeat('x', 7).'// change'.str_repeat('y', 5).'//cahnge// change');
+Check::same('кусками — столько же, сколько целиком', array_map(
+	static fn(int $chunk): ?int => Utils::countChangeMarkersInFile($markerFile, $chunk),
+	[1, 3, 8, 9, 1048576]
+), [3, 3, 3, 3, 3]);
+Check::same('нет файла — null', Utils::countChangeMarkersInFile($site.'/нет.php'), null);
+unlink($markerFile);
+
 Check::group('путь оригинала');
 
 Check::same('префикс снимается с имени', Utils::originalPath('/www/a/has-change_b.php'), '/www/a/b.php');
@@ -109,28 +126,34 @@ Check::same('префикс не в начале — не зеркало', Utils
 
 Check::group('обход');
 
-$found = array_map(
+$relative = static fn(array $paths): array => array_map(
 	static fn(string $path): string => substr($path, strlen($site)),
-	Scanner::find($site)
+	$paths
 );
 
-Check::same('найдено ровно то, что надо', $found, [
+$scope = Scanner::getScope($site.'/');
+Check::same('разделы — публичная часть и ядро', array_keys($scope), ['PUBLIC', 'CORE']);
+
+$found = [];
+foreach($scope as $section)
+{
+	$found = array_merge($found, $relative(Scanner::find($section['dir'], $section['skip'])));
+}
+
+Check::same('по разделам найдено ровно то, что надо', $found, [
+	'/crm/has-change_index.php',
 	'/bitrix/components/has-change_dir/has-change_tpl.php',
 	'/bitrix/js/ui/has-change_gone.js',
 	'/bitrix/modules/crm/lib/has-change_drift.php',
 	'/bitrix/modules/crm/lib/has-change_ok.php',
 	'/bitrix/modules/crm/lib/has-change_same-size.php',
+	'/bitrix/modules/main/lib/cache/has-change_engine.php',
 	'/bitrix/templates/main/has-change_nomark.php',
-	'/crm/has-change_index.php',
 ]);
 
-$found = Scanner::find($site, [$site.'/bitrix']);
-Check::same('пропуск по пути', array_map(static fn(string $path): string => substr($path, strlen($site)), $found), ['/crm/has-change_index.php']);
-
-$found = Scanner::find($site.'/bitrix/', [$site.'/bitrix/modules/'], []);
 Check::same(
-	'без пропуска по имени кеш и резервные копии видны, пути со слэшем на конце — те же',
-	array_map(static fn(string $path): string => substr($path, strlen($site)), $found),
+	'пропуск по пути — только на своём уровне',
+	$relative(Scanner::find($site.'/bitrix/', [$site.'/bitrix/modules/'], [])),
 	[
 		'/bitrix/backup/has-change_backup.php',
 		'/bitrix/cache/has-change_cached.php',
@@ -140,23 +163,71 @@ Check::same(
 	]
 );
 
+$put('/.git/objects/has-change_x.php', $edited);
+Check::same('.git — не обходится нигде', in_array('/.git/objects/has-change_x.php', $relative(Scanner::find($site)), true), false);
+
 Check::same('каталога нет — пусто, а не ошибка', Scanner::find($site.'/нет'), []);
 
 // Ссылка наверх: обход по ней не закончился бы никогда.
+$before = count(Scanner::find($site));
 symlink($site, $site.'/bitrix/modules/loop');
 symlink($site.'/crm', $site.'/crm-link');
-$found = Scanner::find($site);
-Check::same('по символическим ссылкам на каталоги не ходим', count($found), 7);
+Check::same('по символическим ссылкам на каталоги не ходим', count(Scanner::find($site)), $before);
 
-// Нечитаемый каталог. Под root права не действуют — там проверять нечего.
-if(function_exists('posix_geteuid') && posix_geteuid() !== 0)
+// Нечитаемые каталог и файл. Под root права не действуют, и проверка
+// выглядела бы пройденной — поэтому под root она идёт от имени nobody
+// (setpriv), а нечем сменить пользователя — тест краснеет.
+$closed = sys_get_temp_dir().'/shef-haschangefiles-closed-'.getmypid();
+mkdir($closed.'/lib', 0777, true);
+foreach(['status', 'utils', 'changefile', 'scanner'] as $class)
 {
-	mkdir($site.'/closed');
-	$put('/closed/has-change_x.php', $edited);
-	chmod($site.'/closed', 0000);
-	Check::same('нечитаемый каталог пропускается', count(Scanner::find($site)), 7);
-	chmod($site.'/closed', 0777);
+	copy($root.'/lib/main/'.$class.'.php', $closed.'/lib/'.$class.'.php');
 }
+mkdir($closed.'/site/open', 0777, true);
+mkdir($closed.'/site/shut', 0777, true);
+file_put_contents($closed.'/site/open/has-change_a.php', $edited);
+file_put_contents($closed.'/site/open/a.php', $edited);
+file_put_contents($closed.'/site/shut/has-change_b.php', $edited);
+file_put_contents($closed.'/site/open/has-change_c.php', $edited);
+file_put_contents($closed.'/site/open/c.php', $edited);
+chmod($closed.'/site/open/c.php', 0000);
+chmod($closed.'/site/open/has-change_c.php', 0000);
+chmod($closed.'/site/shut', 0000);
+exec('chmod -R a+rX '.escapeshellarg($closed.'/lib').' && chmod a+rx '.escapeshellarg($closed).' '.escapeshellarg($closed.'/site').' '.escapeshellarg($closed.'/site/open'));
+file_put_contents($closed.'/probe.php', <<<'PHP'
+<?php
+set_error_handler(static function(int $level, string $message): bool { echo 'WARNING ', $message, PHP_EOL; return true; });
+foreach(['status', 'utils', 'changefile', 'scanner'] as $class) { require __DIR__.'/lib/'.$class.'.php'; }
+$found = \Shef\Haschangefiles\Main\Scanner::find(__DIR__.'/site');
+echo 'FOUND ', count($found), PHP_EOL;
+echo 'STATUS ', (new \Shef\Haschangefiles\Main\ChangeFile(__DIR__.'/site/open/has-change_c.php'))->getStatus()->value, PHP_EOL;
+PHP);
+chmod($closed.'/probe.php', 0644);
+
+$isRoot = function_exists('posix_geteuid') && posix_geteuid() === 0;
+$prefix = '';
+if($isRoot)
+{
+	$setpriv = trim((string)shell_exec('command -v setpriv'));
+	$prefix = $setpriv === '' ? '' : escapeshellarg($setpriv).' --reuid=65534 --regid=65534 --clear-groups ';
+}
+
+if($isRoot && $prefix === '')
+{
+	Check::same('под root нужен setpriv, чтобы проверить нечитаемый каталог', false, true);
+}
+else
+{
+	exec($prefix.escapeshellarg(PHP_BINARY).' '.escapeshellarg($closed.'/probe.php').' 2>&1', $probe, $probeCode);
+	Check::same(
+		'нечитаемый каталог пропускается, нечитаемый файл — «разошёлся», и всё без warning',
+		[$probeCode, $probe],
+		[0, ['FOUND 2', 'STATUS DRIFT']]
+	);
+}
+
+chmod($closed.'/site/shut', 0777);
+exec('rm -rf '.escapeshellarg($closed));
 
 // region Уборка ////
 exec('rm -rf '.escapeshellarg($site));

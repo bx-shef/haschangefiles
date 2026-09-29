@@ -20,20 +20,64 @@ namespace Shef\Haschangefiles\Main;
 class Scanner
 {
 	/**
-	 * Каталоги, в которых правок ядра не бывает, а файлов — сотни тысяч.
-	 * Пропускаются по имени на любой глубине.
+	 * Имена каталогов, которые не обходятся на любой глубине.
+	 *
+	 * Только .git. До 2.0.0 здесь были и cache, tmp, upload, backup,
+	 * updates — и зеркало в bitrix/modules/<модуль>/lib/cache/ не видели ни
+	 * страница, ни консоль. Тяжёлые каталоги пропускаются по пути, на своём
+	 * уровне: getScope().
 	 */
 	public const DEFAULT_SKIP_NAMES = [
 		'.git',
-		'backup',
-		'cache',
-		'html_pages',
-		'managed_cache',
-		'stack_cache',
-		'tmp',
-		'updates',
-		'upload',
 	];
+
+	/**
+	 * Где искать правки — одно и то же для страницы отчёта и консоли.
+	 *
+	 * Публичная часть — корень сайта без /bitrix (у него свой раздел),
+	 * /upload (данные), /local (код проекта: обновление его не
+	 * перезаписывает) и /images. Ядро — /bitrix без каталогов, где правок
+	 * не бывает, а файлов много.
+	 *
+	 * @return array<string, array{dir: string, skip: string[]}> код раздела => что обходить
+	 */
+	public static function getScope(string $documentRoot): array
+	{
+		$documentRoot = static::normalize($documentRoot);
+		$bitrix = $documentRoot.'/bitrix';
+
+		$prefix = static fn(string $base, array $dirs): array => array_map(
+			static fn(string $dir): string => $base.$dir,
+			$dirs
+		);
+
+		return [
+			'PUBLIC' => [
+				'dir' => $documentRoot,
+				'skip' => $prefix($documentRoot, ['/bitrix', '/upload', '/local', '/images']),
+			],
+			'CORE' => [
+				'dir' => $bitrix,
+				'skip' => $prefix($bitrix, [
+					'/backup',
+					'/blocks',
+					'/cache',
+					'/catalog_export',
+					'/fonts',
+					'/html_pages',
+					'/image_uploader',
+					'/managed_cache',
+					'/mobileapp',
+					'/otp',
+					'/panel',
+					'/sounds',
+					'/stack_cache',
+					'/tmp',
+					'/updates',
+				]),
+			],
+		];
+	}
 
 	/**
 	 * @param string $baseDir где искать, абсолютный путь

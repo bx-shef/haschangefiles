@@ -3,7 +3,7 @@
 # Правят их здесь. sync.sh --to их не трогает, --check сверяет с диском.
 # Пересобрать: .claude/skills/sync.sh --local
 #
-679ed16ecd61464c706ff6379d57424babb93473dcb350cea07a308575469e34  shef-core-change/SKILL.md
+b272a012c872d79b0eabb92730d6f50bcb68c6819e9e58f010768d97ebf8e2e2  shef-core-change/SKILL.md
 a8fe824250b5cb6620b8afec1ae05c0b40faae04c427010c33a2b0f7b8174542  shef-core-change/evals/selection.json
-53eb8567f2d51afdafbeccda836bdefa71a386e5c80b2ffdd87ca4ee85682990  shef-restore-core-changes/SKILL.md
+3407d97dcb55aa33afa9ef636eea47a47e7f507cb30a87acea5691f84405caeb  shef-restore-core-changes/SKILL.md
 1648380843088035b0475b1292704b65f8313f0b01e5c403ebdd0f123c7e5b39  shef-restore-core-changes/evals/selection.json

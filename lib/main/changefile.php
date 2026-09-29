@@ -63,21 +63,28 @@ class ChangeFile
 	{
 		if(null === $this->markers)
 		{
-			$content = $this->isOriginalExists() ? file_get_contents($this->originalPath) : '';
-			$this->markers = Utils::countChangeMarkers(is_string($content) ? $content : '');
+			$this->markers = Utils::countChangeMarkersInFile($this->originalPath) ?? 0;
 		}
 
 		return $this->markers;
 	}
 
+	/**
+	 * Маркеры считаются только у совпавших файлов: разошедшийся — DRIFT и
+	 * без них. Сами маркеры читаются кусками (Utils::countChangeMarkersInFile)
+	 * — файл в сотни мегабайт иначе ронял отчёт и консоль по памяти.
+	 */
 	public function getStatus(): Status
 	{
 		if(null === $this->status)
 		{
+			$isExists = $this->isOriginalExists();
+			$isSame = $isExists && Utils::isSameContent($this->originalPath, $this->mirrorPath);
+
 			$this->status = Utils::getStatus(
-				$this->isOriginalExists(),
-				Utils::isSameContent($this->originalPath, $this->mirrorPath),
-				$this->getMarkers()
+				$isExists,
+				$isSame,
+				$isSame ? $this->getMarkers() : 0
 			);
 		}
 

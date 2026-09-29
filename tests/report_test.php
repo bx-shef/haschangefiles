@@ -33,6 +33,11 @@ $site = sys_get_temp_dir().'/shef-haschangefiles-report-'.getmypid();
 Check::group('разделы');
 
 $sections = Report::getSections($site.'/');
+Check::same(
+	'обход — тот же, что у консоли (Scanner::getScope)',
+	array_map(static fn(array $section): array => ['dir' => $section['dir'], 'skip' => $section['skip']], $sections),
+	array_values(\Shef\Haschangefiles\Main\Scanner::getScope($site))
+);
 Check::same('два раздела', array_column($sections, 'code'), ['PUBLIC', 'CORE']);
 Check::same(
 	'публичная часть — без ядра, данных и кода проекта',
@@ -61,15 +66,21 @@ Check::same('у каждого состояния есть подпись', $mis
 Check::group('строка: экранирование');
 
 $evil = '<img src=x onerror=alert(1)>.php';
-mkdir($site.'/upload/<b>', 0777, true);
-file_put_contents($site.'/upload/<b>/'.$evil, "// change ////\n");
-file_put_contents($site.'/upload/<b>/has-change_'.$evil, "// change ////\n");
+$evilDir = '<svg onload=1>';
+mkdir($site.'/crm/'.$evilDir, 0777, true);
+file_put_contents($site.'/crm/'.$evilDir.'/'.$evil, "// change ////\n");
+file_put_contents($site.'/crm/'.$evilDir.'/has-change_'.$evil, "// change ////\n");
 
-$row = Report::getRow(new ChangeFile($site.'/upload/<b>/has-change_'.$evil), 1, $site, 'proj', '/www');
+$row = Report::getRow(new ChangeFile($site.'/crm/'.$evilDir.'/has-change_'.$evil), 1, $site, 'proj', '/www');
 $html = implode('', array_map('strval', $row['columns']));
 
 Check::same('разметки из имени файла нет', str_contains($html, '<img'), false);
-Check::same('разметки из пути нет', str_contains($html, '<b>/'), false);
+Check::same('разметки из пути нет', str_contains($html, '<svg'), false);
+Check::same(
+	'ячейка файла целиком',
+	$row['columns']['FILE'],
+	'<b>&lt;img src=x onerror=alert(1)&gt;.php</b><br>/crm/&lt;svg onload=1&gt;'
+);
 Check::same('имя видно — экранированным', str_contains($row['columns']['FILE'], '&lt;img src=x onerror=alert(1)&gt;.php'), true);
 Check::same('состояние — «на месте»', str_contains($row['columns']['STATUS'], 'На месте'), true);
 Check::same('атрибут строки — код состояния', $row['attrs'], ['data-sh-status' => 'OK']);
