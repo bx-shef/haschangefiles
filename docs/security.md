@@ -49,21 +49,8 @@
 правку не вернут.
 
 Имя зеркала — договорённость модуля, его не меняем. Закрывается правилом
-веб-сервера — nginx:
-
-```nginx
-location ~ /has-change_ { deny all; }
-```
-
-Apache (`.htaccess` в корне сайта):
-
-```apache
-<FilesMatch "^has-change_">
-	Require all denied
-</FilesMatch>
-```
-
-Проверка на стенде — [portal-check.md](portal-check.md), шаг F.
+веб-сервера на каждом портале (решение владельца, 2026-09-29) — пошагово для
+nginx и Apache, с проверкой: [webserver.md](webserver.md).
 
 ## Консольная проверка
 

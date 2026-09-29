@@ -181,7 +181,8 @@ BASE_DIR=/bitrix/modules/main php bitrix/modules/shef.haschangefiles/cli/check-c
 число строк в отчёте равно числу строк состояния в выводе консоли.
 `DOCUMENT_ROOT=/tmp php …/check-core-changes.php; echo $?` — код `2`, а не `0`.
 
-Зеркала не отдаются веб-сервером (правило из [security.md](security.md)):
+Зеркала не отдаются веб-сервером — правило ставится по
+[webserver.md](webserver.md), до этого шага:
 
 ```bash
 cp bitrix/modules/main/sh_test.php bitrix/tools/has-change_sh_probe.php
