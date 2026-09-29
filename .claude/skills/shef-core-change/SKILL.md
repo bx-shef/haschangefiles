@@ -71,9 +71,10 @@ cp bitrix/modules/crm/lib/order.php bitrix/modules/crm/lib/has-change_order.php
 Зеркало `.php` в каталоге, который отдаёт веб-сервер
 (`/bitrix/components/…/ajax.php`, `/bitrix/tools/`, публичная часть), —
 исполняемая по URL копия кода. На сервере должно стоять правило, закрывающее
-`has-change_*` (nginx: `location ~ /has-change_ { deny all; }`, подробности —
-[security.md](https://github.com/bx-shef/haschangefiles/blob/main/docs/security.md)).
-Не знаете, стоит ли, — скажите об этом человеку.
+`has-change_*` — пошагово для nginx и Apache, с проверкой:
+[webserver.md](https://github.com/bx-shef/haschangefiles/blob/main/docs/webserver.md).
+Не знаете, стоит ли, — скажите об этом человеку: правило ставит
+администратор сервера, не вы.
 
 ## 3. Проверить
 

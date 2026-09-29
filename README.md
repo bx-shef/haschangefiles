@@ -58,8 +58,10 @@ composer require bxshef/haschangefiles
    умолчанию — имя сервера; назван иначе или сайт лежит в проекте не в корне —
    **Настройки → Настройки продукта → Настройки модулей → [SH] Правки ядра**
    → вкладка «PhpStorm».
-3. Веб-сервер не должен отдавать зеркала `has-change_*` — правило для nginx и
-   Apache в [безопасности](https://github.com/bx-shef/haschangefiles/blob/main/docs/security.md).
+3. **Закройте зеркала от веб-сервера**: зеркало `has-change_*.php` иначе
+   исполняется по URL — это копия прежнего, возможно уязвимого, кода.
+   Пошагово для nginx и Apache —
+   [инструкция](https://github.com/bx-shef/haschangefiles/blob/main/docs/webserver.md).
 
 # Как пользоваться
 
@@ -86,6 +88,7 @@ php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php   # 0 — вс
 * [как вести правки ядра](https://github.com/bx-shef/haschangefiles/blob/main/docs/1_usage.md)
 * [проверка из консоли](https://github.com/bx-shef/haschangefiles/blob/main/docs/2_cli.md)
 * [безопасность](https://github.com/bx-shef/haschangefiles/blob/main/docs/security.md)
+* [закрыть зеркала от веб-сервера](https://github.com/bx-shef/haschangefiles/blob/main/docs/webserver.md)
 * [запускаемые примеры](https://github.com/bx-shef/haschangefiles/blob/main/examples/README.md)
 * [проверка на портале](https://github.com/bx-shef/haschangefiles/blob/main/docs/portal-check.md)
 * [change log](https://github.com/bx-shef/haschangefiles/blob/main/CHANGELOG.md)
