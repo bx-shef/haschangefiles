@@ -51,17 +51,19 @@
 идёт.
 
 **Навыки — двух видов.** Навыки линейки (`shef-options-*`, `shef-new-*` и
-прочие из `MANIFEST`) — **копия**: их раскладывает `sync.sh --to` из
-[bx-shef/options](https://github.com/bx-shef/options), там же их и правят.
-Задача `Skills` в CI сверяет копию с источником и краснеет, когда источник
-ушёл вперёд — это сигнал разложить заново, а не чинить копию.
+прочие из `MANIFEST`) — **копия** из
+[bx-shef/skills](https://github.com/bx-shef/skills) на коммите из
+`.claude/skills/SOURCE`, там же их и правят (до 2026-10 источником был
+`bx-shef/options`). Обновить — `.claude/skills/update.sh` (PR с новым
+`SOURCE`); задача `Skills` в CI (`update.sh --verify`) сверяет копию с этим
+коммитом — покраснела, значит копию правили руками: разложите заново.
 
 Навыки про работу с правками ядра — **локальные**, их источник здесь:
 `shef-core-change` (внести правку в ядро: сначала поискать замену без ядра,
 потом пометка `// change ////` и зеркало) и `shef-restore-core-changes`
 (вернуть правки после обновления Битрикса по консольной проверке). Они
 перечислены в `.claude/skills/LOCAL.MANIFEST`: после правки —
-`.claude/skills/sync.sh --local`, иначе `--check` краснеет; `sync.sh --to`
+`.claude/skills/sync.sh --local`, иначе `--check` краснеет; `update.sh`
 их не трогает. Оформление — по правилам `.claude/skills/README.md` (evals
 обязательны), классы `\Shef\Haschangefiles\...` из навыков проверяет
 `tests/docs_test.php`, наличие — `tests/skills_test.php`.

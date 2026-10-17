@@ -143,7 +143,7 @@ if(0 !== $code)
 Check::same('манифест сходится с навыками', $code, 0);
 
 // Каждый навык обязан быть в манифесте: иначе получатель его не проверит.
-// Манифестов два: MANIFEST — копия линейки из shef.options, LOCAL.MANIFEST —
+// Манифестов два: MANIFEST — копия линейки из bx-shef/skills, LOCAL.MANIFEST —
 // навыки про сам shef.haschangefiles (shef-core-change и сосед), их источник здесь.
 $paths = static function(string $file): array
 {
