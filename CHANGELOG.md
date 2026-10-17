@@ -1,5 +1,13 @@
 # shef.haschangefiles change log
 
+## 2.0.2 — 2026-10-17
+
+* Навыки линейки берутся из [bx-shef/skills](https://github.com/bx-shef/skills)
+  (из `bx-shef/options` их убрали, задача CI `Skills` падала на 404). Коммит
+  источника — в `.claude/skills/SOURCE`, обновление — `.claude/skills/update.sh`,
+  сверка в CI — `update.sh --verify`. Локальные навыки `shef-core-change` и
+  `shef-restore-core-changes` не тронуты.
+
 ## 2.0.1 — 2026-10-17
 
 * Порядок в списке решений (`MODULE_SORT`) — 1003: модули линейки идут по

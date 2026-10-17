@@ -119,17 +119,18 @@ git ls-remote --heads origin
 ## Навыки агента
 
 Навыки линейки в `.claude/skills/` — копия из
-[bx-shef/options](https://github.com/bx-shef/options), её раскладывает
-`sync.sh`. Такой навык правят **в shef.options**, потом раскладывают сюда:
+[bx-shef/skills](https://github.com/bx-shef/skills) на коммите из
+`.claude/skills/SOURCE` (до 2026-10 — из `bx-shef/options`). Такой навык правят
+**в bx-shef/skills**, потом обновляют копию здесь отдельным PR:
 
 ```bash
-../options/.claude/skills/sync.sh --to .
+.claude/skills/update.sh
 ./build.sh --check
 ```
 
 Правка копии на месте будет затёрта следующей раскладкой, а до неё — поймана:
-`tests/skills_test.php` сверяет копию с её `MANIFEST`, задача `Skills` в CI — с
-источником.
+`tests/skills_test.php` сверяет копию с её `MANIFEST`, задача `Skills` в CI
+(`update.sh --verify`) — с источником на коммите из `SOURCE`.
 
 Локальные навыки — `shef-core-change` и `shef-restore-core-changes` — правят
 здесь, после правки пересобирают `LOCAL.MANIFEST`:
