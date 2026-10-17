@@ -66,7 +66,7 @@ Class shef_haschangefiles
 		$this->MODULE_DESCRIPTION = Loc::getMessage('shef.haschangefiles_MODULE_DESC');
 		
 		$sort = 'MODULE_SORT';
-		$this->{$sort} = (int)'1010';
+		$this->{$sort} = (int)'1003';
 
 		$this->PARTNER_NAME = Loc::getMessage('shef.haschangefiles_PARTNER_NAME');
 		$this->PARTNER_URI = Loc::getMessage('shef.haschangefiles_PARTNER_URI');
