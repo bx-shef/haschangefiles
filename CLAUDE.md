@@ -38,6 +38,7 @@
 | `optionsconf_test.php` | `options_conf.php` собирается против API shef.options 3.x |
 | `constants_test.php` | коды `PRJ_name` / `PRJ_path` — те, что пишет страница настроек; проект по умолчанию — имя сервера |
 | `include_test.php` | подключение модуля поднимает shef.options и больше ничего |
+| `layout_test.php` | `install/layout.php` для портала из git (bx-shef/options#55): ровно заглушка, что пишет `AdminPage::install()`, без ядра |
 | `uninstall_test.php` | установка ничего не копирует, убирает каталоги 1.x и регистрации 1.x; удаление уносит настройки, обработчики (включая два из 1.x) и свою заглушку, чужое не трогает |
 | `composer_test.php` | тип пакета, `installer-name`, потолок `composer/installers` |
 | `docs_test.php` | ссылки в `*.md` живые, классы и методы из документации существуют |

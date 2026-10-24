@@ -1,5 +1,11 @@
 # shef.haschangefiles change log
 
+## 2.0.3 — 2026-10-24
+
+* `install/layout.php` — раскладка вне каталога модуля для портала, который выкладывается из git
+  (bx-shef/options#55): заглушка страницы отчёта, ровно как `InstallFiles()`. Читает
+  `tools/layout.php` shef.options 3.3.0 без портала; `tests/layout_test.php` сверяет с `AdminPage`.
+
 ## 2.0.2 — 2026-10-17
 
 * Навыки линейки берутся из [bx-shef/skills](https://github.com/bx-shef/skills)
