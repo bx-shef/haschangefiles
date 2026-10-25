@@ -4,7 +4,7 @@
 # Пересобрать: .claude/skills/sync.sh --local
 #
 1e69839c978596442721c9670abddf8f86a174182f865a07d35b9b883ee6dbdb  README.md
-82700c6b7e73295cac931ef358accfce755913f20485e533901e34ca530aae56  SOURCE
+1d5cdf8adef7eba1cb4b7bc37af361f83ee35666d861eaadf7aef51b6cb8c5bd  SOURCE
 270e2cde58a368f85491b2f08a04110ad71751245ed698540f48e8fd27fbcb85  shef-core-change/SKILL.md
 a8fe824250b5cb6620b8afec1ae05c0b40faae04c427010c33a2b0f7b8174542  shef-core-change/evals/selection.json
 3407d97dcb55aa33afa9ef636eea47a47e7f507cb30a87acea5691f84405caeb  shef-restore-core-changes/SKILL.md
