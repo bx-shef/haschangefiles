@@ -148,7 +148,7 @@ examples/x.php` — на живом портале. Шапка — ЦЕЛЬ, Г�
 версией.
 
 **Composer — `bxshef/haschangefiles`, тип `bitrix-module`**, `installer-name =
-shef.haschangefiles`, лицензия MIT, потолок `composer/installers`. Всё — ровно
+shef.haschangefiles`, лицензия proprietary (права у ООО «БэИксШефБай»), потолок `composer/installers`. Всё — ровно
 как в shef.options и по тем же причинам (см. его CLAUDE.md, «bitrix-d7-module
 развернул бы модуль не туда»). В 1.x стояло `shef/haschangefiles` +
 `bitrix-d7-module` + `proprietary`, требования `shef/options ^2.2` и
