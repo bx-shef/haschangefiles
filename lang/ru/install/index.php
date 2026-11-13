@@ -1,7 +1,7 @@
 <?php
 $MESS['shef.haschangefiles_MODULE_NAME'] = '[SH] Правки ядра';
 $MESS['shef.haschangefiles_MODULE_DESC'] = 'Учёт исправленных файлов ядра Битрикс24 | БУС: какие правки перезаписало обновление и что вернуть.';
-$MESS['shef.haschangefiles_PARTNER_NAME'] = 'ИП Шевчик И.С.';
+$MESS['shef.haschangefiles_PARTNER_NAME'] = 'ООО «БэИксШефБай»';
 $MESS['shef.haschangefiles_PARTNER_URI'] = 'https://bx-shef.by';
 
 $MESS['SH_MOD_BACK'] = 'К списку модулей';

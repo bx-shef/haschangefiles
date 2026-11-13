@@ -95,4 +95,4 @@ php bitrix/modules/shef.haschangefiles/cli/check-core-changes.php   # 0 — вс
 
 # Лицензия
 
-[MIT](https://github.com/bx-shef/haschangefiles/blob/main/LICENSE)
+Права принадлежат ООО «БэИксШефБай» — [LICENSE](https://github.com/bx-shef/haschangefiles/blob/main/LICENSE).

@@ -2,7 +2,7 @@
 	"name": "bxshef/haschangefiles",
 	"description": "Битрикс24 (коробка): учёт исправленных файлов ядра — какие правки перезаписало обновление и что вернуть",
 	"type": "bitrix-module",
-	"license": "MIT",
+	"license": "proprietary",
 	"keywords": [
 		"bitrix",
 		"Bitrix24",
